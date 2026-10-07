@@ -11,9 +11,9 @@ export async function weeklyExcelBlob(s){excelModule ||= new Promise((resolve,re
  const widths=[22,48,12,15,12,18,58,14,42];
  const sheet=book.addWorksheet('주간 통합보고',{views:[{state:'frozen',ySplit:2}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:2'}});
  sheet.columns=widths.map(width=>({width}));
- sheet.mergeCells('A1:I1');sheet.getCell('A1').value=s.week+' 주간 통합보고';sheet.getCell('A1').font={name:'맑은 고딕',size:16,bold:true,color:{argb:'FF17365D'}};sheet.getRow(1).height=30;
+ sheet.mergeCells('A1:I1');sheet.getCell('A1').value=s.week+' 주간 통합보고';sheet.getCell('A1').font={name:'맑은 고딕',size:16,bold:true,color:{argb:'FF626EE6'}};sheet.getRow(1).height=30;
  sheet.mergeCells('A2:I2');sheet.getCell('A2').value='생성: '+new Date(s.created_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' · 작성: '+s.author+' · 제출 '+s.reports.length+'건';sheet.getRow(2).height=24;
- const style=(row,header,index=0)=>row.eachCell({includeEmpty:true},cell=>{cell.font={name:'맑은 고딕',size:11,...(header?{bold:true,color:{argb:'FFFFFFFF'}}:{})};cell.alignment={vertical:'top',wrapText:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:header?'FF17365D':index%2?'FFF0F5FC':'FFFFFFFF'}};cell.border={bottom:{style:'thin',color:{argb:'FFD9E2F0'}}}});
+ const style=(row,header,index=0)=>row.eachCell({includeEmpty:true},cell=>{cell.font={name:'맑은 고딕',size:11,...(header?{bold:true,color:{argb:'FFFFFFFF'}}:{})};cell.alignment={vertical:'top',wrapText:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:header?'FF626EE6':index%2?'FFF8F9FA':'FFFFFFFF'}};cell.border={bottom:{style:'thin',color:{argb:'FFE1E1E1'}}}});
  let cursor=4;
  const titleRow=title=>{sheet.mergeCells(cursor,1,cursor,9);const row=sheet.getRow(cursor);row.getCell(1).value=title;row.height=28;style(row,true);cursor++;};
  const textRow=text=>{sheet.mergeCells(cursor,1,cursor,9);const row=sheet.getRow(cursor);row.getCell(1).value=text;row.height=Math.min(300,Math.max(26,Math.ceil(String(text).length/100)*20));style(row,false);cursor++;};
