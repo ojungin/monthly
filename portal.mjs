@@ -1,4 +1,4 @@
-import {weeklyExcelBlob} from './excel.mjs?v=20261007-exports';
+import {weeklyExcelBlob} from './excel.mjs?v=20261007-single-sheet';
 import {escapeHTML as e,monday} from './core.mjs';
 import {groupedNotes,weeklyBody} from './weekly.mjs';
 export const menus=[['dashboard','홈'],['files','주간 업무 보고서 저장소'],['write','금주 주간 업무 작성'],['edit','주간 업무 보고 수정'],['weekly','주간 업무 보고 통합 문서 생성'],['monthly','월 성과 보고서 생성'],['members','팀원 관리']];
