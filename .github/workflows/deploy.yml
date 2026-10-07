@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: '24'
       - run: npm test
+      - name: Check live seminar source
+        run: node scripts/check-seminar-source.mjs
       - run: npm run build
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
