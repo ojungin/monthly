@@ -1,4 +1,4 @@
-import {emptyMetrics,metricTitles,metricRows,dayShift} from './metrics.mjs';
+import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.mjs';
 import {groupedNotes} from './weekly.mjs';
 export function weeklyExcelRows(s){const person=id=>s.members.find(m=>m.id===id)?.name||'미등록';return {
  tasks:[['프로젝트','업무내용','상태','목표 일정','진행률','업무담당자','주요성과','서비스','업무 ID'],...s.reports.flatMap(r=>r.items.map(i=>[i.project,i.title,i.state,i.target_date?new Date(i.target_date+'T00:00:00Z'):null,i.progress/100,person(r.user_id),i.result||'',i.service||'',i.id||''])).sort((a,b)=>a[0].localeCompare(b[0],'ko'))],
@@ -23,7 +23,7 @@ export async function weeklyExcelBlob(s){excelModule ||= new Promise((resolve,re
  for(const values of [['지표','값','비교'],...metricRows(summary,i)]){
   sheet.mergeCells(cursor,1,cursor,4);sheet.mergeCells(cursor,5,cursor,6);sheet.mergeCells(cursor,7,cursor,9);
   const row=sheet.getRow(cursor);row.getCell(1).value=values[0];row.getCell(5).value=values[1];row.getCell(7).value=values[2];row.height=34;style(row,values[0]==='지표');cursor++;
- }textRow(part.note||'');cursor++;});
+ }textRow(part.note||'');for(const n of (i===0?[0,1]:i===1?[2]:[3]))textRow('출처: '+sources[n][0]+' · '+sources[n][1]);cursor++;});
  textRow('지표 조회: '+(summary.fetched_at||'미조회'));
  titleRow('4. 주간 업무');const taskHeader=cursor;
  data.tasks.forEach((values,n)=>{const row=sheet.getRow(n+taskHeader);row.values=values;row.height=n?Math.min(350,Math.max(38,...values.map((v,c)=>String(v??'').split('\n').reduce((a,line)=>a+Math.max(1,Math.ceil(line.length/(widths[c]*0.7))),0)*16))):28;style(row,!n,n);if(n){row.getCell(4).numFmt='yyyy-mm-dd';row.getCell(5).numFmt='0%'}});
