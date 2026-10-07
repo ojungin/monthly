@@ -1,5 +1,5 @@
 import {escapeHTML as e,monday,monthReports,summarize,csv,validateItems,canEditReport} from './core.mjs';
-import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs';
+import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261007-rules';
 const $=s=>document.querySelector(s), root=$('#app');
 const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
 const cfg=window.REPORT_CONFIG||{}, configured=!!(cfg.supabaseUrl&&cfg.publishableKey);
