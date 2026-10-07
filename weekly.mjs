@@ -1,5 +1,5 @@
-import {reportStyles} from './report-design.mjs?v=20261008-report-design';
-import {metricsBody,dayShift} from './metrics.mjs?v=20261008-report-design';
+import {reportStyles} from './report-design.mjs?v=20261008-report-design-final';
+import {metricsBody,dayShift} from './metrics.mjs?v=20261008-report-design-final';
 import {escapeHTML as e, summarize} from './core.mjs';
 export function weeklySnapshot(reports,members,week,author){
  const selected=reports.filter(r=>r.status==='submitted'&&r.week_start===week);
