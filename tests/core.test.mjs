@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {monday,monthReports,summarize,csv,escapeHTML,validateItems} from '../core.mjs';
+import {monday,monthReports,summarize,csv,escapeHTML,validateItems,canEditReport} from '../core.mjs';
+test('관리자는 제출 보고만 수정, 팀원은 본인 보고만 수정',()=>{const r={user_id:'writer',status:'submitted'};assert.equal(canEditReport({id:'other',role:'member'},r),false);assert.equal(canEditReport({id:'admin',role:'admin'},r),true);assert.equal(canEditReport({id:'admin',role:'admin'},{...r,status:'draft'}),false);assert.equal(canEditReport({id:'writer',role:'member'},{...r,status:'draft'}),true)});
 test('일요일 및 월 경계의 월요일 계산',()=>{assert.equal(monday('2026-11-01'),'2026-10-26');assert.equal(monday('2026-10-07'),'2026-10-05')});
 test('월 취합은 제출 보고만 포함하고 중복 팀원 수를 제거',()=>{const items=[{state:'완료'},{state:'진행'}],r=[{user_id:'a',week_start:'2026-10-05',status:'submitted',items},{user_id:'a',week_start:'2026-10-12',status:'submitted',items},{user_id:'b',week_start:'2026-10-12',status:'draft',items},{user_id:'c',week_start:'2026-09-28',status:'submitted',items}];assert.deepEqual(summarize(monthReports(r,'2026-10')),{reports:2,people:1,items:[...items,...items],done:2})});
 test('CSV는 한글 BOM, 개행, 따옴표 및 수식 입력을 보호',()=>{assert.equal(csv([['=CMD()', '한글,"줄\n바꿈']]),'\ufeff"\'=CMD()","한글,""줄\n바꿈"');assert.match(csv([[' @SUM(A1)']]),/"' @SUM/)});
