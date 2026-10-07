@@ -1,0 +1,11 @@
+import {escapeHTML as e, summarize} from './core.mjs';
+export function weeklySnapshot(reports,members,week,author){
+ const selected=reports.filter(r=>r.status==='submitted'&&r.week_start===week);
+ if(!selected.length)throw Error('선택한 주에 제출된 보고가 없습니다.');
+ return {version:1,id:crypto.randomUUID(),week,created_at:new Date().toISOString(),author,members:structuredClone(members.map(({id,name,team})=>({id,name,team}))),reports:structuredClone(selected)};
+}
+export function weeklyBody(s){
+ const stats=summarize(s.reports),person=id=>s.members.find(m=>m.id===id)||{name:'알 수 없는 팀원',team:''};
+ return `<h1>${e(s.week)} 주간 통합보고</h1><p>생성: ${e(new Date(s.created_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))} · 작성: ${e(s.author)}</p><p>제출 ${stats.people} / ${s.members.length}명 · 업무 ${stats.items.length}건 · 완료 ${stats.done}건</p><p>미제출: ${e(s.members.filter(m=>!s.reports.some(r=>r.user_id===m.id)).map(m=>m.name).join(', ')||'없음')}</p>`+s.reports.map(r=>`<section><h2>${e(person(r.user_id).name)} · ${e(person(r.user_id).team)}</h2><table><thead><tr><th>프로젝트</th><th>업무 내용</th><th>상태 / 진행률</th><th>주요 성과</th></tr></thead><tbody>${r.items.map(i=>`<tr><td>${e(i.project)}</td><td>${e(i.title)}</td><td>${e(i.state)} / ${e(i.progress)}%</td><td>${e(i.result||'없음')}</td></tr>`).join('')}</tbody></table><h3>이슈 및 지원 요청</h3><p>${e(r.issues||'없음')}</p><h3>다음 주 계획</h3><p>${e(r.next_plan||'없음')}</p></section>`).join('');
+}
+export function weeklyFile(s){return `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${e(s.week)} 주간 통합보고</title><style>body{font:15px Arial,'Malgun Gothic',sans-serif;color:#182944;max-width:1100px;margin:40px auto;padding:20px}h1{border-bottom:3px solid #2464dd;padding-bottom:20px}section{margin:32px 0}table{border-collapse:collapse;width:100%}th,td{border:1px solid #dce5ef;padding:12px;text-align:left;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere}th{background:#eef3fb}p{white-space:pre-wrap;line-height:1.7}@media print{@page{size:A4;margin:14mm}body{margin:0;padding:0}tr{break-inside:avoid}}</style><body>${weeklyBody(s)}<script type="application/json" id="weekly-data">${JSON.stringify(s).replaceAll('<','\\u003c')}</script></body></html>`}
