@@ -2,7 +2,7 @@ import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.m
 import {groupedNotes} from './weekly.mjs?v=20261008-report-design-final';
 export function weeklyExcelRows(s){const person=id=>s.members.find(m=>m.id===id)?.name||'미등록';return {
  tasks:[['프로젝트','업무내용','상태','목표 일정','진행률','업무담당자','주요성과','서비스','업무 ID'],...s.reports.flatMap(r=>r.items.map(i=>[i.project,i.title,i.state,i.target_date?new Date(i.target_date+'T00:00:00Z'):null,i.progress/100,person(r.user_id),i.result||'',i.service||'',i.id||''])).sort((a,b)=>a[0].localeCompare(b[0],'ko'))],
- issues:[['카테고리','이슈 및 지원 요청','담당자'],...groupedNotes(s.reports,'issues').flatMap(g=>g.entries.map(x=>[g.category,x.text,x.owners.map(person).join(', ')]))],
+ issues:[['카테고리','금주 이슈 및 대응','담당자'],...groupedNotes(s.reports,'issues').flatMap(g=>g.entries.map(x=>[g.category,x.text,x.owners.map(person).join(', ')]))],
  plans:[['카테고리','다음 주 계획','담당자'],...groupedNotes(s.reports,'next_plan').flatMap(g=>g.entries.map(x=>[g.category,x.text,x.owners.map(person).join(', ')]))]
 }}
 let excelModule;
@@ -29,7 +29,7 @@ export async function weeklyExcelBlob(s){excelModule ||= new Promise((resolve,re
  data.tasks.forEach((values,n)=>{const row=sheet.getRow(n+taskHeader);row.values=values;row.height=n?Math.min(350,Math.max(38,...values.map((v,c)=>String(v??'').split('\n').reduce((a,line)=>a+Math.max(1,Math.ceil(line.length/(widths[c]*0.7))),0)*16))):28;style(row,!n,n);if(n){row.getCell(4).numFmt='yyyy-mm-dd';row.getCell(5).numFmt='0%'}});
  const taskEnd=data.tasks.length+taskHeader-1;sheet.autoFilter={from:{row:taskHeader,column:1},to:{row:taskEnd,column:9}};
  cursor=taskEnd+3;
- for(const [key,title] of [['issues','5. 이슈 및 지원 요청'],['plans','6. 다음주 계획']]){
+ for(const [key,title] of [['issues','5. 금주 이슈 및 대응'],['plans','6. 다음주 계획']]){
   sheet.mergeCells(cursor,1,cursor,9);const titleRow=sheet.getRow(cursor);titleRow.getCell(1).value=title;titleRow.height=28;style(titleRow,true);cursor++;
   const rows=data[key].length>1?data[key]:[data[key][0],['일반','없음','']];
   for(const [n,values] of rows.entries()){
