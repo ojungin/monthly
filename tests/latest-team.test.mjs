@@ -1,0 +1,4 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {latestTeamReports} from '../core.mjs';
+test('latest team reports include previous submissions but exclude drafts and future weeks',()=>{const rs=[{id:'old',user_id:'a',week_start:'2026-09-28',status:'submitted',updated_at:'2026-10-08'},{id:'new',user_id:'a',week_start:'2026-10-05',status:'submitted',updated_at:'2026-10-07'},{id:'previous',user_id:'b',week_start:'2026-09-28',status:'submitted'},{id:'draft',user_id:'b',week_start:'2026-10-05',status:'draft'},{id:'future',user_id:'c',week_start:'2026-10-12',status:'submitted'},{id:'edited',user_id:'a',week_start:'2026-10-05',status:'submitted',updated_at:'2026-10-08'}];const before=JSON.stringify(rs);assert.deepEqual(latestTeamReports(rs,'2026-10-05').map(r=>r.id),['edited','previous']);assert.equal(JSON.stringify(rs),before);assert.deepEqual(latestTeamReports(rs,'2026-09-21'),[])});
