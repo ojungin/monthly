@@ -1,7 +1,7 @@
-import {emptyMetrics,loadMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261008-calendar-latest';
-import {menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261008-calendar-latest';
-import {escapeHTML as e,monday,monthReports,summarize,csv,validateItems,canEditReport,latestTeamReports} from './core.mjs?v=20261008-calendar-latest';
-import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261008-calendar-latest';
+import {emptyMetrics,loadMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261008-hide-submission';
+import {menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261008-hide-submission';
+import {escapeHTML as e,monday,monthReports,summarize,csv,validateItems,canEditReport,latestTeamReports} from './core.mjs?v=20261008-hide-submission';
+import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261008-hide-submission';
 const $=s=>document.querySelector(s), root=$('#app');
 const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
 const cfg=window.REPORT_CONFIG||{}, configured=!!(cfg.supabaseUrl&&cfg.publishableKey);
