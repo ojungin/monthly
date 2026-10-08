@@ -1,7 +1,7 @@
-import {reportStyles} from './report-design.mjs?v=20261008-monthly-design';
-import {weeklyExcelBlob} from './excel.mjs?v=20261008-monthly-design';
+import {reportStyles} from './report-design.mjs?v=20261008-monthly-design-final';
+import {weeklyExcelBlob} from './excel.mjs?v=20261008-monthly-design-final';
 import {escapeHTML as e,monday} from './core.mjs';
-import {groupedNotes,weeklyBody} from './weekly.mjs?v=20261008-monthly-design';
+import {groupedNotes,weeklyBody} from './weekly.mjs?v=20261008-monthly-design-final';
 export const menus=[['dashboard','홈'],['files','주간 업무 보고서 저장소'],['write','금주 주간 업무 작성'],['edit','주간 업무 보고 수정'],['weekly','주간 업무 보고 통합 문서 생성'],['monthly','월 성과 보고서 생성'],['members','팀원 관리']];
 export function shiftDay(day,n){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function latestDocuments(docs){const m=new Map();for(const d of [...docs].sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id))){const k=d.kind+':'+d.period;if(!m.has(k))m.set(k,d)}return [...m.values()]}
