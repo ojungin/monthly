@@ -1,4 +1,4 @@
-import {emptyMetrics,loadMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261012-metric-recovery';
+import {emptyMetrics,loadMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261012-ytd-mau';
 import {menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261008-weekly-issues';
 import {escapeHTML as e,monday,monthReports,summarize,csv,validateItems,canEditReport,latestTeamReports} from './core.mjs?v=20261008-weekly-issues';
 import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261008-weekly-issues';
