@@ -1,7 +1,7 @@
-import {emptyMetrics,loadMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261012-ytd-mau';
-import {menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261008-weekly-issues';
+import {emptyMetrics,loadMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261012-metric-details';
+import {menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261012-metric-details';
 import {escapeHTML as e,monday,monthReports,summarize,csv,validateItems,canEditReport,latestTeamReports} from './core.mjs?v=20261008-weekly-issues';
-import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261008-weekly-issues';
+import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261012-metric-details';
 const $=s=>document.querySelector(s), root=$('#app');
 const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date());
 const cfg=window.REPORT_CONFIG||{}, configured=!!(cfg.supabaseUrl&&cfg.publishableKey);
