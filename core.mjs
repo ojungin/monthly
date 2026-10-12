@@ -8,3 +8,5 @@ export function validateItems(items){if(!items.length)throw Error('업무를 한
 
 // 기준 주간 이전의 제출본 중 팀원별 최신 보고 주간, 최신 수정본을 선택합니다.
 export function latestTeamReports(reports,week){const latest=new Map();for(const r of reports.filter(r=>r.status==='submitted'&&r.week_start<=week).slice().sort((a,b)=>b.week_start.localeCompare(a.week_start)||String(b.updated_at||'').localeCompare(String(a.updated_at||''))||String(b.id||'').localeCompare(String(a.id||''))))if(!latest.has(r.user_id))latest.set(r.user_id,r);return [...latest.values()]}
+
+export function filterTeamTasks(reports,filters={}){const byTask=new Map();for(const r of reports.filter(r=>r.status==='submitted'&&(!filters.month||r.week_start.startsWith(filters.month))&&(!filters.owner||r.user_id===filters.owner)).slice().sort((a,b)=>b.week_start.localeCompare(a.week_start)||String(b.updated_at||'').localeCompare(String(a.updated_at||''))))r.items.forEach((item,n)=>{const key=r.user_id+':'+(item.id||r.id+'-'+n);if(!byTask.has(key))byTask.set(key,{...item,owner:r.user_id,sourceWeek:r.week_start})});return [...byTask.values()].filter(i=>!filters.state||i.state===filters.state)}
