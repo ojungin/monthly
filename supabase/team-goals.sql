@@ -37,13 +37,13 @@ grant select,insert,update on public.team_goals,public.team_goal_strategies to a
 drop policy if exists goals_read on public.team_goals;
 create policy goals_read on public.team_goals for select to authenticated using(public.is_member());
 drop policy if exists goals_add on public.team_goals;
-create policy goals_add on public.team_goals for insert to authenticated with check(public.is_member() and created_by=auth.uid());
+create policy goals_add on public.team_goals for insert to authenticated with check(public.is_admin() and created_by=auth.uid());
 drop policy if exists goals_edit on public.team_goals;
-create policy goals_edit on public.team_goals for update to authenticated using(public.is_member()) with check(public.is_member());
+create policy goals_edit on public.team_goals for update to authenticated using(public.is_admin()) with check(public.is_admin());
 drop policy if exists strategies_read on public.team_goal_strategies;
 create policy strategies_read on public.team_goal_strategies for select to authenticated using(public.is_member());
 drop policy if exists strategies_add on public.team_goal_strategies;
 create policy strategies_add on public.team_goal_strategies for insert to authenticated with check(public.is_member() and created_by=auth.uid());
 drop policy if exists strategies_edit on public.team_goal_strategies;
-create policy strategies_edit on public.team_goal_strategies for update to authenticated using(public.is_member()) with check(public.is_member());
+create policy strategies_edit on public.team_goal_strategies for update to authenticated using(public.is_admin()) with check(public.is_admin());
 commit;
