@@ -1,4 +1,4 @@
-import {goalCatalog,goalManagementPage} from './goal-management.mjs?v=20261014-milestones';
+import {goalCatalog,goalManagementPage} from './goal-management.mjs?v=20261014-annual-milestones';
 import {personalGoalsPage} from './personal-goals.mjs?v=20261014-personal-goals';
 import {teamGoalsPage} from './team-goals.mjs?v=20261014-personal-goals';
 import {dashboardSession,loginDashboard,disconnectDashboard,loadDatabaseMetrics} from './dashboard-db.mjs?v=20261014-dashboard-db';
@@ -90,4 +90,4 @@ function kpiTeamPage(){shell('<h1>팀 목표 설정</h1><section class="panel">�
 function kpiPersonalPage(){shell('<h1>개인 목표 설정</h1><section class="panel">개인 목표를 불러오는 중입니다…</section>');personalGoalsPage({shell,member:me,user,members,client,demo,run,toast,isActive:()=>view==='kpi-personal'}).catch(err=>{if(view==='kpi-personal')shell('<h1>개인 목표 설정</h1><section class="panel"><p class="error">'+e(err.message)+'</p></section>')});}
 
 function personalGoalChoices(item){const ownerId=editing?.user_id||user.id;const options=personalGoalOptions.filter(g=>g.user_id===ownerId);return '<option value="">개인목표 선택</option>'+(!options.some(g=>g.id===item.personal_goal_id)&&item.personal_goal_id?'<option value="'+e(item.personal_goal_id)+'" selected>기존 연결 목표 (현재 조회 불가)</option>':'')+options.map(g=>'<option value="'+e(g.id)+'" '+(item.personal_goal_id===g.id?'selected':'')+'>'+e(g.year+' · '+g.personal_goal)+'</option>').join('');}
-function kpiGoalManagementPage(){shell('<h1>목표관리</h1><section class="panel">마일스톤을 불러오는 중입니다…</section>');goalManagementPage({shell,member:me,members,client,demo,reports,today,isActive:()=>view==='kpi-goals'}).catch(err=>{if(view==='kpi-goals')shell('<h1>목표관리</h1><section class="panel error">'+e(err.message)+'</section>');});}
+function kpiGoalManagementPage(){shell('<h1>목표관리</h1><section class="panel">마일스톤을 불러오는 중입니다…</section>');goalManagementPage({shell,member:me,members,client,demo,reports,today,run,isActive:()=>view==='kpi-goals'}).catch(err=>{if(view==='kpi-goals')shell('<h1>목표관리</h1><section class="panel error">'+e(err.message)+'</section>');});}

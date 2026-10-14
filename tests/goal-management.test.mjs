@@ -23,3 +23,18 @@ test('month milestone columns include month boundary weeks',()=>{
  assert.deepEqual(monthWeeks('2026-10'),['2026-09-28','2026-10-05','2026-10-12','2026-10-19','2026-10-26']);
  assert.equal(monthWeeks('2027-02').length,4);
 });
+
+import {periodWeeks,monthGroups,assertMilestoneExport,milestoneExportRows} from '../goal-management.mjs';
+test('year and quarter periods cover boundary weeks without duplicate annual columns',()=>{
+ const year=periodWeeks(2026);assert.equal(year.length,53);assert.equal(year[0].date,'2025-12-29');assert.equal(year.at(-1).date,'2026-12-28');assert.equal(new Set(year.map(w=>w.date)).size,year.length);
+ assert.equal(monthGroups(year).reduce((n,g)=>n+g.count,0),year.length);assert.equal(monthGroups(year).length,12);
+ const q=periodWeeks(2026,'2');assert.equal(q[0].date,'2026-03-30');assert.equal(q[0].month,'2026-04');assert.equal(q[0].label,'1주');assert.equal(q.at(-1).date,'2026-06-29');
+ assert.throws(()=>periodWeeks(2026,'5'));assert.throws(()=>periodWeeks(0));
+});
+test('Excel extraction requires a manager and exports typed percentages with future weeks blank',()=>{
+ assert.throws(()=>assertMilestoneExport({role:'member'}),/관리자/);assert.doesNotThrow(()=>assertMilestoneExport({role:'admin'}));
+ const row={id:'a:0',user_id:'u',strategy_id:'s',personal_goal:'목표',target_date:'2026-12-01'};
+ const reports=[{id:'r',user_id:'u',status:'submitted',week_start:'2026-10-05',items:[{id:'t',personal_goal_id:'a:0',progress:50}]}];
+ const output=milestoneExportRows([row],[{date:'2026-10-05'},{date:'2026-10-12'},{date:'2026-10-19'}],reports,'2026-10-14',[{id:'g',business_goal:'부서',team_goal:'팀'}],[{id:'s',goal_id:'g',period:'하반기',strategy:'계획'}],[{id:'u',name:'팀원'}]);
+ assert.deepEqual(output[0],['부서','팀','하반기 · 계획','목표','팀원','2026-12-01',0.5,0.5,null]);
+});
