@@ -1,10 +1,10 @@
 import {escapeHTML as e} from './core.mjs';
 export const metricTitles=['1. 주요 지표 · 회원 및 활동성','2. 비학술 세미나 기획 및 운영 지표','3. 포인트 지급·사용·잔여 지표'];
 export const sources=[
- ['회원분석','https://docs.google.com/spreadsheets/d/18Oaw2ldpiZu_uvaNQG2YNkwou7WWpi6itI-Scjpn070/edit'],
- ['주간 활동성·페이지별 지표','https://docs.google.com/spreadsheets/d/1h-2L8oN7NMJ0BNmc3tJlugis8BetsndeP8-SpG3GgqU/edit'],
+ ['Dashboard_DV 회원 DB','https://ojungin.github.io/doctorville_dash/'],
+ ['Dashboard_DV 활동성 DB','https://ojungin.github.io/doctorville_dash/#activity'],
  ['비학술 세미나 · raw','https://docs.google.com/spreadsheets/d/1UQqI5Yqjt7pSReSFb0IltpBInHijTFY8eHq0Df-B3Ow/edit'],
- ['포인트 대시보드','https://ojungin.github.io/doctorville_dash/#points']];
+ ['Dashboard_DV 포인트 DB','https://ojungin.github.io/doctorville_dash/#points']];
 export function dayShift(day,n){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function isoWeek(day){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+3-(d.getUTCDay()+6)%7);const year=d.getUTCFullYear(),first=new Date(Date.UTC(year,0,4,12));return year+'-W'+String(1+Math.round((d-first)/604800000)).padStart(2,'0')}
 export function numberValue(v){if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(String(v).replace(/[,\s명점%]/g,''));return Number.isFinite(n)?n:null}
@@ -32,22 +32,6 @@ export function pointMetrics(data,week){
 
 async function readJSON(url,options){const response=await fetch(url,{...options,signal:AbortSignal.timeout(45000)});if(!response.ok)throw Error('지표 원본 조회 실패 ('+response.status+')');return response.json()}
 export function metricError(error){const message=String(error?.message||error);if(/unauthorized/.test(message))return '원본 시트 연동 비밀번호가 일치하지 않습니다. 대시보드 로그인 비밀번호와 시트 연동 비밀번호를 확인해주세요.';if(/locked/.test(message))return '원본 시트 연동이 비밀번호 오류로 잠겼습니다. 10분 후 다시 조회해주세요.';if(/password_not_set/.test(message))return '원본 시트에 연동 비밀번호가 설정되지 않았습니다.';if(/Failed to fetch|NetworkError|Unexpected token|JSON/i.test(message))return '원본 연결 실패: Apps Script 배포 권한·응답·네트워크를 확인해주세요.';return message}
-async function loadPointSource(base,password,read,svc='dv'){const [meta,box]=await Promise.all([read(base+'data/meta.json'),read(base+(svc==='pv'?'data/pv_points.enc.json':'data/points.enc.json'))]);const unb64=x=>Uint8Array.from(atob(x),c=>c.charCodeAt(0)),seed=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']),key=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:unb64(meta.salt),iterations:meta.iter},seed,{name:'AES-GCM',length:256},false,['decrypt']);const decode=async b=>JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(b.iv)},key,unb64(b.ct))));try{await decode(meta.check)}catch{throw Error('포인트 원본 복호화 비밀번호가 일치하지 않습니다.')}return decode(box)}
-export async function loadMetrics(week,password,options={}){
- const summary=emptyMetrics(week),read=options.read||readJSON,seminar=options.seminar||loadSeminarMetrics,points=options.points||loadPointSource,base='https://ojungin.github.io/doctorville_dash/';
- const tasks=[(async()=>{try{summary.sections[1]=await seminar(week)}catch(err){summary.sections[1].note='세미나 조회 실패: '+metricError(err)}})()];
- if(!password){summary.sections[0].note='회원·활동성 지표 조회에는 원본 시트 연동 비밀번호가 필요합니다.';summary.sections[2].note='포인트 지표 조회에는 대시보드 비밀번호가 필요합니다.'}
- else{
- tasks.push((async()=>{const parts=await Promise.all(['dv','pv'].map(async svc=>{const platform=svc==='pv'?'팜빌':'닥터빌';try{const part=pointMetrics(await points(base,password,read,svc),week);part.rows=part.rows.map(r=>({...r,platform}));return {...part,platform}}catch(err){return {platform,rows:[],note:platform+' 포인트 조회 실패: '+metricError(err)}}}));summary.sections[2]={...emptyMetrics(week).sections[2],rows:parts.flatMap(p=>p.rows),platform_notes:Object.fromEntries(parts.map(p=>[p.platform,p.note])),platform_details:parts.filter(p=>p.detail_headers).map(p=>({...p,detail_title:p.platform+' · '+p.detail_title})),note:parts.map(p=>p.platform+': '+p.note).join('\n')};})());
- tasks.push((async()=>{let config;try{config=await read(base+'data/config.json');if(!config.appsScriptUrl)throw Error('원본 시트 연동 주소가 없습니다.')}catch(err){summary.sections[0].note='회원·활동성 조회 실패: '+metricError(err);return}
- const post=async body=>{const result=await read(config.appsScriptUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,password})});if(!result.ok)throw Error(result.error||'원본 시트가 정상 응답을 보내지 않았습니다.');return result};
- // 원본 Apps Script의 지원 action을 사용하고 회원·활동성 실패를 각각 보존합니다.
- await Promise.all([(async()=>{try{const data=await post({action:'activity'}),section=activityMetrics(data.activity,week);summary.sections[0].rows.push(...section.rows.map(r=>({...r,platform:'닥터빌'})));summary.sections[0].note=section.note||'활동성 원본 조회 완료.'}catch(err){summary.sections[0].note='활동성 조회 실패: '+metricError(err)}})(),...['dv','pv'].map(svc=>(async()=>{const platform=svc==='pv'?'팜빌':'닥터빌';try{const data=await post({action:'get',week:isoWeek(week),...(svc==='pv'?{svc:'pv'}:{})});if(data.snap&&(data.snap.svc||'dv')!==svc)throw Error('원본 Apps Script가 팜빌 요청에 닥터빌 값을 반환했습니다. 팜빌 지원 버전으로 재배포해주세요.');if(data.snap?.weekStart!==week)throw Error('선택한 주간의 회원 집계가 원본에 없습니다.');const prev=data.prev?.weekStart===dayShift(week,-7)?data.prev:null;summary.sections[0].rows.push({...metric('전체 회원',data.snap.kpi?.total,'명',prev?.kpi?.total),platform},{...metric('신규 회원',data.snap.kpi?.newWeek,'명',data.snap.kpi?.newPrevWeek),platform});summary.sections[0].platform_notes||={};summary.sections[0].platform_notes[platform]=platform+' 회원 조회 완료 · 가입일 기준 신규 회원이며 순증감은 미확인입니다.';}catch(err){summary.sections[0].platform_notes||={};summary.sections[0].platform_notes[platform]=platform+' 회원 조회 실패: '+metricError(err)}})())]);
- summary.sections[0].note+=' '+Object.values(summary.sections[0].platform_notes||{}).join(' ');
- })());
- }
- await Promise.all(tasks);summary.fetched_at=new Date().toISOString();return summary;
-}
 
 export const seminarSourceURL='https://docs.google.com/spreadsheets/d/1UQqI5Yqjt7pSReSFb0IltpBInHijTFY8eHq0Df-B3Ow/gviz/tq?gid=1830918551&range=D1%3AO1000&headers=1';
 export function parseGVizResponse(text){const start=text.indexOf('{'),end=text.lastIndexOf('}');if(start<0||end<start)throw Error('세미나 원본 응답을 확인할 수 없습니다.');return JSON.parse(text.slice(start,end+1))}

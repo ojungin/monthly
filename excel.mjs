@@ -1,5 +1,5 @@
-import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.mjs?v=20261012-platform-isolation';
-import {groupedNotes,reporterNotes} from './weekly.mjs?v=20261012-reporter-notes';
+import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.mjs?v=20261014-dashboard-db';
+import {groupedNotes,reporterNotes} from './weekly.mjs?v=20261014-dashboard-db';
 export function weeklyExcelRows(s){const person=id=>s.members.find(m=>m.id===id)?.name||'미등록';return {
  tasks:[['구분/플랫폼명','업무내용','상태','목표 일정','진행률','업무담당자','주요성과','서비스','업무 ID'],...s.reports.flatMap(r=>r.items.map(i=>[i.project,i.title,i.state,i.target_date?new Date(i.target_date+'T00:00:00Z'):null,i.progress/100,person(r.user_id),i.result||'',i.service||'',i.id||''])).sort((a,b)=>a[0].localeCompare(b[0],'ko'))],
  issues:[['보고자','금주 이슈 및 대응','소속'],...reporterNotes(s,'issues').map(r=>[r.name,r.text,r.team])],

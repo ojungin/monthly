@@ -43,13 +43,13 @@ test('direct seminar response decodes Google dates, formatted counts and zero sc
  assert.throws(()=>seminarRowsFromTable({status:'error'}));cols[8].label='변경';assert.throws(()=>seminarRowsFromTable(response),/열 구성/);
 });
 test('seminar loader works without a password or Apps Script request',async()=>{
- const {loadMetrics}=await import('../metrics.mjs');
+ const {loadSeminarMetrics}=await import('../metrics.mjs');
  const originalDocument=globalThis.document,originalWindow=globalThis.window,originalFetch=globalThis.fetch;
  const cols=Array.from({length:12},(_,i)=>({label:({0:'일자',7:'완료',8:'신청자 수',9:'시청자 수',10:'만족도',11:'유용도'})[i]||'기타'}));
  let source='';
  try{
   globalThis.window={};globalThis.document={createElement:()=>({remove(){}}),head:{append(script){source=script.src;const handler=new URL(source).searchParams.get('tqx').split('responseHandler:')[1];queueMicrotask(()=>window[handler]({status:'ok',table:{cols,rows:[]}}));}}};
   globalThis.fetch=()=>{throw Error('비밀번호 없는 조회가 Apps Script를 호출했습니다.');};
-  const m=await loadMetrics('2026-10-05','');assert.equal(m.sections[1].rows[0].value,0);assert.match(source,/gid=1830918551/);assert(!source.includes('password'));assert.equal(Object.keys(window).length,0);
+  const m=await loadSeminarMetrics('2026-10-05');assert.equal(m.rows[0].value,0);assert.match(source,/gid=1830918551/);assert(!source.includes('password'));assert.equal(Object.keys(window).length,0);
  }finally{if(originalDocument===undefined)delete globalThis.document;else globalThis.document=originalDocument;if(originalWindow===undefined)delete globalThis.window;else globalThis.window=originalWindow;globalThis.fetch=originalFetch;}
 });
