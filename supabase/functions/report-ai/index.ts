@@ -15,7 +15,19 @@ Deno.serve(async req=>{
  const base=Deno.env.get('SUPABASE_URL'),key=Deno.env.get('SUPABASE_ANON_KEY'),apiKey=Deno.env.get('OPENAI_API_KEY'),authorization=req.headers.get('authorization');
  if(!authorization)return json({error:'로그인이 필요합니다.'},401);
  const headers={apikey:key!,Authorization:authorization,'Content-Type':'application/json'};
- const rest=async(path:string,body?:unknown)=>{const r=await fetch(base+'/rest/v1/'+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined});if(!r.ok)throw Error('DB 권한 또는 GPT 요약 SQL 설정을 확인해주세요.');return r.json();};
+ const rest=async(path:string,body?:unknown)=>{
+  const r=await fetch(base+'/rest/v1/'+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined});
+  const payload=await r.text();
+  if(!r.ok){
+   let detail='';try{const error=JSON.parse(payload);detail=error.message||error.error||'';}catch{}
+   throw Error('DB 요청 실패 (HTTP '+r.status+', '+path.split('?')[0]+'): '+(detail||'권한 또는 GPT 요약 SQL 설정을 확인해주세요.'));
+  }
+  if(!payload.trim()){
+   if(path==='rpc/claim_report_ai'||path==='rpc/release_report_ai')return null;
+   throw Error('DB에서 빈 응답을 반환했습니다: '+path.split('?')[0]);
+  }
+  try{return JSON.parse(payload);}catch{throw Error('DB 응답을 해석하지 못했습니다: '+path.split('?')[0]);}
+ };
  let id:string|undefined;
  try{
   const auth=await fetch(base+'/auth/v1/user',{headers});if(!auth.ok)return json({error:'로그인이 만료되었습니다.'},401);const user=await auth.json();
@@ -28,8 +40,9 @@ Deno.serve(async req=>{
   if(doc.kind==='monthly'){const rows=await rest('report_documents?select=id,period,snapshot&kind=eq.weekly&period=gte.'+doc.period+'-01&period=lte.'+doc.period+'-31&order=created_at.desc');const seen=new Set();weekly_metrics=rows.filter((r:any)=>{if(seen.has(r.period))return false;seen.add(r.period);return !!r.snapshot.metrics;}).map((r:any)=>({id:r.id,week:r.period,metrics:r.snapshot.metrics}));}
   const input=JSON.stringify({kind:doc.kind,period:doc.period,members:s.members,reports:s.reports,weekly_metrics});if(input.length>350000)throw Error('보고서 내용이 너무 많습니다. 관리자에게 문의해주세요.');
   const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:AbortSignal.timeout(110000),headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify({model:Deno.env.get('OPENAI_REPORT_MODEL')||'gpt-4.1-mini',store:false,instructions:summaryInstructions,input,max_output_tokens:12000,text:{format:{type:'json_schema',name:'team_report_summary',strict:true,schema:summarySchema}}})});
-  if(!response.ok)throw Error('GPT 요청에 실패했습니다. 서버의 API 키·모델·사용 한도를 확인해주세요.');const output=await response.json();if(output.status!=='completed')throw Error('GPT 요약이 완료되지 않았습니다. 다시 시도해주세요.');const text=output.output?.flatMap((x:any)=>x.content||[]).filter((x:any)=>x.type==='output_text').map((x:any)=>x.text).join('');
-  const summary=validSummary(JSON.parse(text),s.reports.map((r:any)=>r.id),(weekly_metrics as any[]).map(r=>r.id));
+  if(!response.ok)throw Error('GPT 요청에 실패했습니다. 서버의 API 키·모델·사용 한도를 확인해주세요.');const output=await response.json();if(output.status!=='completed')throw Error('GPT 요약이 완료되지 않았습니다. 다시 시도해주세요.');const text=output.output?.flatMap((x:any)=>x.content||[]).filter((x:any)=>x.type==='output_text').map((x:any)=>x.text).join('');if(!text?.trim())throw Error('GPT가 요약 내용을 반환하지 않았습니다. 모델 응답을 확인해주세요.');
+  let parsed;try{parsed=JSON.parse(text);}catch{throw Error('GPT 요약 JSON이 불완전합니다. 다시 시도해주세요.');}
+  const summary=validSummary(parsed,s.reports.map((r:any)=>r.id),(weekly_metrics as any[]).map(r=>r.id));
   const saved=await rest('rpc/save_report_ai',{document_id:doc.id,summary_data:{...summary,model:output.model,generated_at:new Date().toISOString()}});return json({document:saved});
  }catch(error){if(id){try{await rest('rpc/release_report_ai',{document_id:id});}catch{}}return json({error:error instanceof Error?error.message:'GPT 요약 생성 실패'},400);}
 });

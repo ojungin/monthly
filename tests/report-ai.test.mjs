@@ -17,7 +17,7 @@ test('edge function integration verifies auth, uses saved snapshot, persists GPT
   if(url.endsWith('/auth/v1/user'))return response({id:'u'});
   if(url.includes('report_documents?select=*'))return response([{...doc,created_by:wrongOwner?'other':'u',snapshot:cached?{...base(),ai_summary:summary()}:base()}]);
   if(url.includes('report_documents?select=id'))return response([]);
-  if(url.endsWith('/rpc/claim_report_ai')){claimed=true;return response(null);}
+  if(url.endsWith('/rpc/claim_report_ai')){claimed=true;return new Response(null,{status:204});}
   if(url==='https://api.openai.com/v1/responses'){assert.ok(claimed);apiCalls++;const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.equal(JSON.parse(payload.input).period,'2026-10');return response({status:'completed',model:'test',output:[{content:[{type:'output_text',text:JSON.stringify(summary())}]}]});}
   if(url.endsWith('/rpc/save_report_ai')){const payload=JSON.parse(options.body);return response({...doc,snapshot:{...base(),ai_summary:payload.summary_data}});}
   throw Error('unexpected endpoint '+url);
@@ -29,4 +29,25 @@ test('edge function integration verifies auth, uses saved snapshot, persists GPT
  cached=true;assert.equal((await handler(request())).status,200);assert.equal(apiCalls,1);
  wrongOwner=true;assert.equal((await handler(request())).status,403);assert.equal(apiCalls,1);
  assert.equal((await handler(new Request('https://example/report-ai',{method:'POST'}))).status,401);
+});
+
+test('edge function accepts empty successful void RPC bodies and reports data-response failures clearly',async()=>{
+ const code=stripTypeScriptTypes(await readFile(new URL('../supabase/functions/report-ai/index.ts',import.meta.url),'utf8'));
+ for(const claimStatus of [200,204]){
+  let handler,apiCalled=false,released=false;
+  const id='11111111-1111-1111-1111-111111111111',doc={id,created_by:'u',kind:'weekly',period:'2026-10-05',snapshot:base()};
+  const response=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+  const fetch=async(url,opts={})=>{
+   if(url.endsWith('/auth/v1/user'))return response({id:'u'});
+   if(url.includes('report_documents?select=*'))return response([doc]);
+   if(url.endsWith('/rpc/claim_report_ai'))return new Response(null,{status:claimStatus});
+   if(url.endsWith('/rpc/release_report_ai')){released=true;return new Response(null,{status:204});}
+   if(url==='https://api.openai.com/v1/responses'){apiCalled=true;return response({status:'completed',output:[]});}
+   throw Error('Unexpected endpoint');
+  };
+  const context={Deno:{env:{get:key=>({SUPABASE_URL:'https://example.supabase.co',SUPABASE_ANON_KEY:'public',OPENAI_API_KEY:'fake-test-only'})[key]},serve:fn=>handler=fn},fetch,Response,AbortSignal,console,Set,Date,JSON,Error};
+  vm.createContext(context);vm.runInContext(code,context);
+  const result=await handler(new Request('https://example/report-ai',{method:'POST',headers:{authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify({document_id:id})}));
+  const body=await result.json();assert.equal(apiCalled,true);assert.equal(released,true);assert.match(body.error,/GPT가 요약 내용을 반환하지 않았습니다/);assert.ok(!body.error.includes('Unexpected end'));
+ }
 });
