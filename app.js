@@ -1,4 +1,4 @@
-import {goalCatalog,goalManagementPage} from './goal-management.mjs?v=20261014-annual-milestones';
+import {goalCatalog,goalManagementPage} from './goal-management.mjs?v=20261015-linked-tasks';
 import {personalGoalsPage} from './personal-goals.mjs?v=20261014-personal-goals';
 import {teamGoalsPage} from './team-goals.mjs?v=20261014-personal-goals';
 import {dashboardSession,loginDashboard,disconnectDashboard,loadDatabaseMetrics} from './dashboard-db.mjs?v=20261014-dashboard-db';

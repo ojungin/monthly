@@ -36,5 +36,17 @@ test('Excel extraction requires a manager and exports typed percentages with fut
  const row={id:'a:0',user_id:'u',strategy_id:'s',personal_goal:'목표',target_date:'2026-12-01'};
  const reports=[{id:'r',user_id:'u',status:'submitted',week_start:'2026-10-05',items:[{id:'t',personal_goal_id:'a:0',progress:50}]}];
  const output=milestoneExportRows([row],[{date:'2026-10-05'},{date:'2026-10-12'},{date:'2026-10-19'}],reports,'2026-10-14',[{id:'g',business_goal:'부서',team_goal:'팀'}],[{id:'s',goal_id:'g',period:'하반기',strategy:'계획'}],[{id:'u',name:'팀원'}]);
- assert.deepEqual(output[0],['부서','팀','하반기 · 계획','목표','팀원','2026-12-01',0.5,0.5,null]);
+ assert.deepEqual(output[0],['부서','팀','하반기 · 계획','목표','팀원','2026-12-01','',0.5,0.5,null]);
+});
+
+import {linkedGoalTasksText} from '../goal-management.mjs';
+test('linked task column uses latest submitted owner tasks as of selected period and excludes future reports',()=>{
+ const goal={id:'a:0',user_id:'u'},task=(title,id='t',link='a:0')=>({id,title,progress:50,personal_goal_id:link});
+ const report=(date,items,extra={})=>({id:date,user_id:'u',status:'submitted',week_start:date,items,...extra});
+ const reports=[report('2026-04-06',[task('old')]),report('2026-06-29',[task('<updated>'),task('second','t2')]),report('2026-07-06',[task('future')]),report('2026-06-29',[task('draft')],{status:'draft'}),report('2026-06-29',[task('other owner')],{user_id:'v'})];
+ assert.equal(linkedGoalTasksText(goal,reports,[{date:'2026-06-29'}],'2026-10-15'),'<updated>\nsecond');
+ assert.equal(linkedGoalTasksText(goal,reports,[{date:'2026-12-28'}],'2026-06-30'),'<updated>\nsecond');
+ assert.equal(linkedGoalTasksText({id:'none',user_id:'u'},reports,[{date:'2026-06-29'}],'2026-10-15'),'');
+ const data=milestoneExportRows([goal],[{date:'2026-06-29'}],reports,'2026-10-15',[],[],[]);
+ assert.equal(data[0][6],'<updated>\nsecond');assert.equal(data[0][7],0.5);
 });
