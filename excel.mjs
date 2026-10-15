@@ -1,43 +1,54 @@
-import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.mjs?v=20261015-seminar-raw';
-import {groupedNotes,reporterNotes} from './weekly.mjs?v=20261015-seminar-raw';
+import {emptyMetrics,metricTitles,dayShift,numberValue,comparison} from './metrics.mjs?v=20261015-export-template';
+import {reporterNotes} from './weekly.mjs?v=20261015-export-template';
 export function weeklyExcelRows(s){const person=id=>s.members.find(m=>m.id===id)?.name||'미등록';return {
  tasks:[['구분/플랫폼명','업무내용','상태','목표 일정','진행률','업무담당자','주요성과','서비스','업무 ID'],...s.reports.flatMap(r=>r.items.map(i=>[i.project,i.title,i.state,i.target_date?new Date(i.target_date+'T00:00:00Z'):null,i.progress/100,person(r.user_id),i.result||'',i.service||'',i.id||''])).sort((a,b)=>a[0].localeCompare(b[0],'ko'))],
  issues:[['보고자','금주 이슈 및 대응','소속'],...reporterNotes(s,'issues').map(r=>[r.name,r.text,r.team])],
  plans:[['보고자','다음 주 계획','소속'],...reporterNotes(s,'next_plan').map(r=>[r.name,r.text,r.team])]
-}}
-let excelModule;
-export async function weeklyExcelBlob(s){excelModule ||= new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';script.onload=()=>resolve(window.ExcelJS);script.onerror=()=>{excelModule=null;reject(Error('Excel 모듈을 불러오지 못했습니다. 네트워크를 확인해주세요.'))};document.head.append(script)});const ExcelJS=await excelModule,book=new ExcelJS.Workbook(),data=weeklyExcelRows(s);book.creator=s.author;book.created=new Date(s.created_at);
-
- const widths=[20,38,12,15,12,10,95,14,30];
- const sheet=book.addWorksheet('주간 통합보고',{views:[{state:'frozen',ySplit:2}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'1:2'}});
- sheet.columns=widths.map(width=>({width}));
- sheet.mergeCells('A1:I1');sheet.getCell('A1').value=s.week+' 주간 통합보고';sheet.getCell('A1').font={name:'맑은 고딕',size:16,bold:true,color:{argb:'FF626EE6'}};sheet.getRow(1).height=30;
- sheet.mergeCells('A2:I2');sheet.getCell('A2').value='생성: '+new Date(s.created_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' · 작성: '+s.author;sheet.getRow(2).height=24;
- const style=(row,header,index=0)=>row.eachCell({includeEmpty:true},cell=>{cell.font={name:'맑은 고딕',size:11,...(header?{bold:true,color:{argb:'FFFFFFFF'}}:{})};cell.alignment={vertical:'top',wrapText:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:header?'FF626EE6':index%2?'FFF8F9FA':'FFFFFFFF'}};cell.border={bottom:{style:'thin',color:{argb:'FFE1E1E1'}}}});
- let cursor=4;
- const titleRow=title=>{sheet.mergeCells(cursor,1,cursor,9);const row=sheet.getRow(cursor);row.getCell(1).value=title;row.height=28;style(row,true);cursor++;};
- const textRow=text=>{sheet.mergeCells(cursor,1,cursor,9);const row=sheet.getRow(cursor);row.getCell(1).value=text;row.height=Math.min(300,Math.max(26,Math.ceil(String(text).length/100)*20));style(row,false);cursor++;};
- titleRow('0. 기간');textRow(s.week+' ~ '+dayShift(s.week,6));cursor++;
- const summary=s.metrics||emptyMetrics(s.week);
- metricTitles.forEach((title,i)=>{const part=summary.sections[i];titleRow(title);textRow('집계 기간: '+part.period);
- for(const platform of ['닥터빌','팜빌']){textRow(platform);for(const values of [['지표명','전주 값','금주 값','증감 비교'],...metricRows(summary,i,platform)]){
- sheet.mergeCells(cursor,1,cursor,3);sheet.mergeCells(cursor,4,cursor,5);sheet.mergeCells(cursor,7,cursor,9);
- const row=sheet.getRow(cursor);row.getCell(1).value=values[0];row.getCell(4).value=values[1];row.getCell(6).value=values[2];row.getCell(7).value=values[3];row.height=34;style(row,values[0]==='지표명');cursor++;
- } for(const detail of (part.platform_details||[part]).filter(p=>(p.platform||'닥터빌')===platform)){if(detail.detail_headers){textRow(detail.detail_title);const rows=[detail.detail_headers,...(detail.detail_rows?.length?detail.detail_rows:[['해당 기간 상세 자료 없음']])];rows.forEach((values,n)=>{const count=detail.detail_headers.length;const row=sheet.getRow(cursor);for(let c=0;c<count;c++){const first=Math.floor(c*9/count)+1,last=Math.floor((c+1)*9/count);if(last>first)sheet.mergeCells(cursor,first,cursor,last);row.getCell(first).value=values[c]??'';}row.height=48;style(row,n===0);cursor++;});}}if(part.platform_notes?.[platform])textRow(part.platform_notes[platform]);}textRow(part.note||'');for(const n of (i===0?[0,1]:i===1?[2]:[3]))textRow('출처: '+sources[n][0]+' · '+sources[n][1]);cursor++;});
- textRow('지표 조회: '+(summary.fetched_at||'미조회'));
- titleRow('4. 주간 업무');const taskHeader=cursor;
- data.tasks.forEach((values,n)=>{const row=sheet.getRow(n+taskHeader);row.values=values;row.height=n?Math.min(350,Math.max(38,...values.map((v,c)=>String(v??'').split('\n').reduce((a,line)=>a+Math.max(1,Math.ceil(line.length/(widths[c]*0.7))),0)*16))):28;style(row,!n,n);if(n){row.getCell(4).numFmt='yyyy-mm-dd';row.getCell(5).numFmt='0%'}});
- const taskEnd=data.tasks.length+taskHeader-1;sheet.autoFilter={from:{row:taskHeader,column:1},to:{row:taskEnd,column:9}};
- cursor=taskEnd+3;
+};}
+const full=[[2,14]],metricSpans=[[2,4],[5,6],[7,7],[8,14]],taskSpans=[[2,2],[3,3],[4,4],[5,5],[6,6],[7,7],[8,12],[13,13],[14,14]],noteSpans=[[2,3],[4,12],[13,14]];
+const width=20.625,bodyLine=15.5,maxLines=22;
+function charWidth(c){return /[^\u0000-\u00ff]/u.test(c)?2:1;}
+function wrappedLines(text,capacity){let count=1,line=0;for(const c of String(text)){if(c==='\n'){count++;line=0;}else{const next=charWidth(c);if(line+next>capacity){count++;line=0;}line+=next;}}return count;}
+export function splitExcelText(value,capacity,limit=maxLines){if(typeof value!=='string')return [value];const chars=Array.from(value),chunks=[];let start=0,line=0,lines=1;for(let i=0;i<chars.length;i++){const c=chars[i],cost=charWidth(c);if(c==='\n'){lines++;line=0;}else{if(line+cost>capacity){lines++;line=0;}line+=cost;}if(lines>limit){const cut=c==='\n'?i+1:i;if(cut>start){chunks.push(chars.slice(start,cut).join(''));start=cut;}lines=1;line=cut>i?0:cost;}}if(start<chars.length||!chunks.length)chunks.push(chars.slice(start).join(''));return chunks;}
+const capacity=([first,last])=>(last-first+1)*width-3;
+const numberFormat=(value,unit='')=>('#,##0'+(Number.isInteger(value)?'':'.00'))+(unit?'"'+unit.replaceAll('"','')+'"':'');
+export function weeklyExcelLayout(s){
+ const rows=[],data=weeklyExcelRows(s),summary=s.metrics||emptyMetrics(s.week);let cursor=5;
+ const add=(values,spans=full,kind='body',formats=[])=>{const chunks=values.map((value,i)=>splitExcelText(value,capacity(spans[i]))),count=Math.max(1,...chunks.map(c=>c.length));for(let part=0;part<count;part++){const cells=spans.map(([from,to],i)=>({from,to,value:chunks[i]?.[part]??'',numFmt:formats[i]}));const lines=Math.max(1,...cells.map(c=>wrappedLines(c.value instanceof Date?'2026-12-31':c.value,capacity([c.from,c.to]))));rows.push({row:cursor++,kind,cells,height:Math.max(26.1,Math.min(409.5,lines*bodyLine+8))});}};
+ const text=(value,kind='body')=>add([value],full,kind),gap=()=>{rows.push({row:cursor++,kind:'gap',height:16,cells:[]});};
+ text('0. 기간','section');text(s.week+' ~ '+dayShift(s.week,6));gap();
+ metricTitles.forEach((title,index)=>{
+  const part=summary.sections?.[index]||{};text(title,'section');text('집계 기간: '+(part.period||s.week+' ~ '+dayShift(s.week,6)));
+  for(const platform of ['닥터빌','팜빌']){
+   text(platform,'platform');add(['지표명','전주 값','금주 값','증감 비교'],metricSpans,'tableHeader');
+   const metrics=(part.rows||[]).filter(r=>(r.platform||(/^\[팜빌\]/.test(r.label)?'팜빌':'닥터빌'))===platform);
+   if(!metrics.length)add(['지표','자료 미확인','자료 미확인',''],metricSpans);
+   metrics.forEach(r=>{const previous=numberValue(r.previous),current=numberValue(r.value);add([r.label.replace(/^\[(닥터빌|팜빌)\]\s*/,''),previous??'자료 미확인',current??'자료 미확인',comparison(r)],metricSpans,'body',['',numberFormat(previous,r.unit),numberFormat(current,r.unit),'']);});
+   for(const detail of (part.platform_details||[part]).filter(p=>(p.platform||'닥터빌')===platform)){
+    if(!detail.detail_headers)continue;text(detail.detail_title||'상세');const count=detail.detail_headers.length;
+    const spans=count===4?[[2,3],[4,5],[6,7],[8,14]]:count===5?[[2,6],[7,8],[9,10],[11,12],[13,14]]:count===6?[[2,5],[6,7],[8,9],[10,11],[12,12],[13,14]]:Array.from({length:count},(_,i)=>[2+Math.floor(i*13/count),1+Math.floor((i+1)*13/count)]);
+    add(detail.detail_headers,spans,'tableHeader');for(const values of detail.detail_rows||[])add(spans.map((_,i)=>values[i]??''),spans);if(!detail.detail_rows?.length)text('해당 기간 상세 자료 없음');
+   }
+  }gap();
+ });
+ text('4. 주간 업무','section');data.tasks.forEach((values,i)=>add(values,taskSpans,i?'body':'tableHeader',i?['','','','yyyy-mm-dd','0%','','','','']:[]));gap();gap();
  for(const [key,title] of [['issues','5. 금주 이슈 및 대응'],['plans','6. 다음주 계획']]){
-  sheet.mergeCells(cursor,1,cursor,9);const titleRow=sheet.getRow(cursor);titleRow.getCell(1).value=title;titleRow.height=28;style(titleRow,true);cursor++;
-  const ai=s.ai_summary?.[key==='issues'?'issues':'plans'];if(ai){textRow('GPT 요약');for(const item of ai)textRow(item.topic+' · '+item.summary);textRow('보고자별 원문');}
-  const rows=data[key].length>1?data[key]:[data[key][0],['일반','없음','']];
-  for(const [n,values] of rows.entries()){
-   sheet.mergeCells(cursor,1,cursor,2);sheet.mergeCells(cursor,3,cursor,7);sheet.mergeCells(cursor,8,cursor,9);
-   const row=sheet.getRow(cursor);row.getCell(1).value=values[0];row.getCell(3).value=values[1];row.getCell(8).value=values[2];row.height=n?Math.min(350,Math.max(38,...values.map((v,c)=>String(v??'').split('\n').reduce((a,line)=>a+Math.max(1,Math.ceil(line.length/([40,85,32][c]))),0)*16))):28;style(row,!n,n);cursor++;
-  }cursor+=2;
+  text(title,'section');const ai=s.ai_summary?.[key==='issues'?'issues':'plans'];if(ai){text('GPT 요약','platform');for(const item of ai)text(item.topic+' · '+item.summary);if(!ai.length)text('해당 내용 없음');text('보고자별 원문','platform');}
+  const values=data[key].length>1?data[key]:[data[key][0],['일반','없음','']];values.forEach((value,i)=>add(value,noteSpans,i?'body':'tableHeader'));gap();gap();
  }
- sheet.pageSetup.printArea='A1:I'+(cursor-3);
- return new Blob([await book.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+ return {title:s.week+' 주간 업무 보고',rows,lastRow:cursor-3};
 }
+export function buildWeeklyExcel(ExcelJS,s){
+ const book=new ExcelJS.Workbook(),layout=weeklyExcelLayout(s);book.creator=s.author;book.created=new Date(s.created_at);
+ const sheet=book.addWorksheet('주간 통합보고',{views:[{state:'frozen',ySplit:3,showGridLines:false}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'2:3',margins:{left:.7,right:.7,top:.75,bottom:.75,header:.3,footer:.3}}});
+ sheet.columns=[{width:1.625},...Array.from({length:13},()=>({width}))];sheet.getRow(1).height=9.95;sheet.getRow(2).height=30;sheet.getRow(3).height=24;
+ const border={top:{style:'thin',color:{argb:'FF000000'}},bottom:{style:'thin',color:{argb:'FF000000'}},left:{style:'thin',color:{argb:'FF000000'}},right:{style:'thin',color:{argb:'FF000000'}}};
+ sheet.mergeCells('B2:N3');const title=sheet.getCell('B2');title.value=layout.title;title.font={name:'맑은 고딕',size:16,bold:true,color:{argb:'FFFFFFFF'}};title.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF595959'}};title.alignment={horizontal:'center',vertical:'middle',wrapText:true};title.border=border;
+ let body=0;
+ for(const record of layout.rows){const row=sheet.getRow(record.row);row.height=record.height;if(record.kind==='gap')continue;const dark=['section','tableHeader'].includes(record.kind),fill=dark?'FF595959':record.kind==='body'&&body++%2?'FFF8F9FA':'FFFFFFFF';
+  for(const data of record.cells){if(data.to>data.from)sheet.mergeCells(record.row,data.from,record.row,data.to);const cell=sheet.getCell(record.row,data.from);cell.value=data.value===''?null:data.value;cell.font={name:'맑은 고딕',size:record.kind==='platform'?14:11,bold:dark||record.kind==='platform',color:{argb:dark?'FFFFFFFF':'FF000000'}};cell.alignment={vertical:'middle',horizontal:dark||typeof data.value==='number'||data.value instanceof Date?'center':'left',wrapText:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:fill}};cell.border=border;if(data.numFmt)cell.numFmt=data.numFmt;}
+ }
+ sheet.pageSetup.printArea='B1:N'+layout.lastRow;return book;
+}
+let excelModule;
+export async function weeklyExcelBlob(s){if(!globalThis.ExcelJS)excelModule||=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';script.onload=()=>resolve(globalThis.ExcelJS);script.onerror=()=>{excelModule=null;reject(Error('Excel 모듈을 불러오지 못했습니다. 네트워크를 확인해주세요.'));};document.head.append(script);});const ExcelJS=globalThis.ExcelJS||await excelModule,book=buildWeeklyExcel(ExcelJS,s);return new Blob([await book.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
