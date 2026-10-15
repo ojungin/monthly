@@ -1,5 +1,5 @@
-import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.mjs?v=20261014-dashboard-db';
-import {groupedNotes,reporterNotes} from './weekly.mjs?v=20261014-dashboard-db';
+import {emptyMetrics,metricTitles,metricRows,dayShift,sources} from './metrics.mjs?v=20261015-gpt-summary';
+import {groupedNotes,reporterNotes} from './weekly.mjs?v=20261015-gpt-summary';
 export function weeklyExcelRows(s){const person=id=>s.members.find(m=>m.id===id)?.name||'미등록';return {
  tasks:[['구분/플랫폼명','업무내용','상태','목표 일정','진행률','업무담당자','주요성과','서비스','업무 ID'],...s.reports.flatMap(r=>r.items.map(i=>[i.project,i.title,i.state,i.target_date?new Date(i.target_date+'T00:00:00Z'):null,i.progress/100,person(r.user_id),i.result||'',i.service||'',i.id||''])).sort((a,b)=>a[0].localeCompare(b[0],'ko'))],
  issues:[['보고자','금주 이슈 및 대응','소속'],...reporterNotes(s,'issues').map(r=>[r.name,r.text,r.team])],
@@ -31,6 +31,7 @@ export async function weeklyExcelBlob(s){excelModule ||= new Promise((resolve,re
  cursor=taskEnd+3;
  for(const [key,title] of [['issues','5. 금주 이슈 및 대응'],['plans','6. 다음주 계획']]){
   sheet.mergeCells(cursor,1,cursor,9);const titleRow=sheet.getRow(cursor);titleRow.getCell(1).value=title;titleRow.height=28;style(titleRow,true);cursor++;
+  const ai=s.ai_summary?.[key==='issues'?'issues':'plans'];if(ai){textRow('GPT 요약');for(const item of ai)textRow(item.topic+' · '+item.summary);textRow('보고자별 원문');}
   const rows=data[key].length>1?data[key]:[data[key][0],['일반','없음','']];
   for(const [n,values] of rows.entries()){
    sheet.mergeCells(cursor,1,cursor,2);sheet.mergeCells(cursor,3,cursor,7);sheet.mergeCells(cursor,8,cursor,9);
