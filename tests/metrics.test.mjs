@@ -17,7 +17,7 @@ test('activity uses latest all-device row and never sums device users',()=>{
 test('seminar counts use exact week, completed sessions and nonempty score averages',()=>{
  const row=(date,done,signup,view,score)=>[date,'','','','','','',done,signup,view,score,''];
  const result=seminarMetrics([row('2026. 10. 5',true,'1,000명',800,90),row('2026. 10. 6',true,200,100,''),row('2026. 10. 7',false,900,800,100),row('2026. 10. 12',true,600,500,100)],'2026-10-05');
- assert.equal(result.rows[0].value,3);assert.equal(result.rows[1].value,2);assert.equal(result.detail_rows.length,2);assert.equal(result.detail_rows[0][1],1000);assert.equal(result.detail_rows[0][3],90);assert.equal(result.detail_rows[1][3],'자료 미확인');
+ assert.equal(result.rows[0].value,3);assert.equal(result.rows[1].value,2);assert.equal(result.detail_rows.length,2);assert.equal(result.detail_rows[0][2],1000);assert.equal(result.detail_rows[0][4],90);assert.equal(result.detail_rows[1][4],'미입력');
 });
 test('points compare exact previous week and never substitute monthly totals',()=>{
  const source={weekly:{weeks:['2026-09-28','2026-10-05'],earn:{amt:[80,100]},use:{amt:[40,30]},expire:{amt:[5,7]},balanceTotal:[90,100],methods:{use:{교환:{amt:[40,30],cnt:[4,3]}}}}};
@@ -38,7 +38,7 @@ test('direct seminar response decodes Google dates, formatted counts and zero sc
  const response={status:'ok',table:{cols,rows:[{c:cells}]}};
  const rows=seminarRowsFromTable(response);assert.equal(rows[0][0],'2026-10-05');
  const summary=await loadSeminarMetrics('2026-10-05',async()=>response);
- assert.equal(summary.detail_rows[0][1],1234);assert.equal(summary.detail_rows[0][2],0);assert.equal(summary.detail_rows[0][3],0);assert.equal(summary.detail_rows[0][4],'자료 미확인');
+ assert.equal(summary.detail_rows[0][2],1234);assert.equal(summary.detail_rows[0][4],0);assert.equal(summary.detail_rows[0][3],0);assert.equal(summary.detail_rows[0][5],'미입력');
  assert.equal(parseGVizResponse('/*O_o*/\ncallback('+JSON.stringify(response)+');').status,'ok');
  assert.throws(()=>seminarRowsFromTable({status:'error'}));cols[8].label='변경';assert.throws(()=>seminarRowsFromTable(response),/열 구성/);
 });

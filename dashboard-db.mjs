@@ -1,5 +1,5 @@
 import {loadSupabase} from './supabase-loader.mjs?v=20261015-login-fix';
-import {emptyMetrics,activityMetrics,pointMetrics,isoWeek,dayShift,numberValue,loadSeminarMetrics} from './metrics.mjs?v=20261014-dashboard-db';
+import {emptyMetrics,activityMetrics,pointMetrics,isoWeek,dayShift,numberValue,loadSeminarMetrics} from './metrics.mjs?v=20261015-seminar-raw';
 let database;
 export async function dashboardClient(){if(database)return database;const response=await fetch('https://ojungin.github.io/doctorville_dash/data/config.json',{cache:'no-cache'});if(!response.ok)throw Error('통계 DB 연결 설정을 불러오지 못했습니다.');const cfg=await response.json();if(!cfg.supabaseUrl||!cfg.supabaseAnonKey)throw Error('Dashboard_DV 연결 정보가 없습니다.');const {createClient}=await loadSupabase();database=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:false,detectSessionInUrl:false,autoRefreshToken:true}});return database;}
 export async function dashboardSession(){const db=await dashboardClient();const {data,error}=await db.auth.getSession();if(error)throw error;return data.session;}
