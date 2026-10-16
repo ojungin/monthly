@@ -18,7 +18,7 @@ test('edge function integration verifies auth, uses saved snapshot, persists GPT
   if(url.includes('report_documents?select=*'))return response([{...doc,created_by:wrongOwner?'other':'u',snapshot:cached?{...base(),ai_summary:summary()}:base()}]);
   if(url.includes('report_documents?select=id'))return response([]);
   if(url.endsWith('/rpc/claim_report_ai')){claimed=true;return new Response(null,{status:204});}
-  if(url==='https://api.openai.com/v1/responses'){assert.ok(claimed);apiCalls++;const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.equal(JSON.parse(payload.input).period,'2026-10');return response({status:'completed',model:'test',output:[{content:[{type:'output_text',text:JSON.stringify(summary())}]}]});}
+  if(url==='https://api.openai.com/v1/responses'){assert.ok(claimed);apiCalls++;const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.deepEqual(payload.text.format.schema.properties.issues.items.properties.report_ids.items.enum,['r']);assert.equal(payload.text.format.schema.properties.issues.items.properties.report_ids.minItems,1);assert.equal(JSON.parse(payload.input).period,'2026-10');return response({status:'completed',model:'test',output:[{content:[{type:'output_text',text:JSON.stringify(summary())}]}]});}
   if(url.endsWith('/rpc/save_report_ai')){const payload=JSON.parse(options.body);return response({...doc,snapshot:{...base(),ai_summary:payload.summary_data}});}
   throw Error('unexpected endpoint '+url);
  };
