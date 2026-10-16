@@ -31,3 +31,18 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:13px 12px
 .milestone-table{min-width:1600px;table-layout:fixed}.milestone-table th,.milestone-table td{min-width:130px;vertical-align:top}.milestone-table th:nth-child(-n+4){width:210px}.milestone-table th:nth-child(5){width:90px}.milestone-table small{display:block;margin-top:6px;color:#65738a}.milestone-table .bar{margin-top:8px}
 
 .milestone-table thead th{width:auto!important;min-width:0;text-align:center}.milestone-table td{min-width:0}.milestone-table thead{position:sticky;top:0;z-index:1}
+
+/* Weekly task editor: reuse within each task, six compact attributes. */
+.task-editor .item-head{justify-content:space-between}
+.task-editor .item-head h3{margin:0}
+.task-picker{display:block;margin:16px 0}
+.task-meta-row{display:grid;grid-template-columns:minmax(150px,1.5fr) minmax(125px,1.2fr) minmax(95px,.8fr) minmax(80px,.7fr) minmax(135px,1fr) minmax(85px,.7fr);gap:10px;align-items:start}
+.task-meta-row .field{min-width:0;margin-bottom:12px}
+.task-meta-row label{font-size:12px}
+.task-meta-row select,.task-meta-row input{min-width:0;width:100%;font-size:13px;padding:10px 6px}
+.task-title,.task-result{width:100%;margin-bottom:12px}
+.task-result textarea{min-height:125px}
+.task-id{display:block;text-align:right;color:#8a8f9c;font-size:10px;line-height:1.5;overflow-wrap:anywhere;margin-top:8px}
+@media(max-width:1200px){.task-meta-row{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.task-meta-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:380px){.task-meta-row{grid-template-columns:minmax(0,1fr)}}
