@@ -22,6 +22,6 @@ test('summary call handles gateway errors and returns saved summaries',async()=>
 test('generation page uses saved snapshot and exposes retry; failures remain visible',async()=>{
  const app=await readFile(new URL('../app.js',import.meta.url),'utf8');
  assert.ok(app.includes('weeklyBody(previewDocument?.snapshot||'));
- assert.ok(app.includes('GPT 요약 생성 / 재시도'));
+ assert.ok(app.includes('요약 생성 / 재시도'));
  assert.ok(app.includes('reportAINotice=err.message;render();throw err'));
 });
