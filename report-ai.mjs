@@ -18,3 +18,10 @@ export async function summarizeDocument(client,documentId){
  if(!data?.document?.snapshot?.ai_summary)throw Error('요약 결과를 확인하지 못했습니다.');
  return data.document;
 }
+
+export async function generateExecutiveReport(client,documentId){
+ const {data,error}=await client.functions.invoke('report-ai',{body:{document_id:documentId,mode:'executive'}});
+ if(error||data?.error){let detail=data?.error||'';const context=error?.context;if(!detail&&typeof context?.json==='function'){try{const body=await (context.clone?context.clone():context).json();detail=body.error||body.message||'';}catch{}}throw Error('경영진 보고서 생성 실패'+(context?.status?' (HTTP '+context.status+')':'')+': '+(detail||'함수 배포 및 연결 상태를 확인해주세요.'));}
+ if(!data?.executive||data.source_document_id!==documentId)throw Error('경영진 보고서 응답을 확인하지 못했습니다. report-ai 함수의 최신 버전을 배포해주세요.');
+ return data;
+}
