@@ -3,7 +3,7 @@ begin;
 create or replace function public.claim_executive_report_ai(document_id uuid)
 returns void language plpgsql security definer set search_path='' as $$
 begin
- if not public.is_admin() then raise exception '관리자/책임자만 경영진 보고서를 생성할 수 있습니다';end if;
+ if auth.uid() is null or not exists(select 1 from public.members m where m.id=auth.uid() and m.role='admin') then raise exception '관리자/책임자만 경영진 보고서를 생성할 수 있습니다';end if;
  perform 1 from public.members where id=auth.uid() for update;
  if not exists(select 1 from public.report_documents d where d.id=document_id and d.kind='weekly' and d.snapshot ? 'ai_summary') then
   raise exception '요약이 완료된 주간 통합 보고서가 필요합니다';
