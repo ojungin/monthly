@@ -1,5 +1,5 @@
 import {emptyMetrics,metricTitles,metricsHeading,dayShift,numberValue,comparison} from './metrics.mjs?v=20261102-report5';
-import {reporterNotes,weeklyStats,weeklySectionTitles} from './weekly.mjs?v=20261102-report5';
+import {reporterNotes,weeklyStats,weeklySectionTitles,weeklyOverview,overviewMessage} from './weekly.mjs?v=20261102-report5';
 export function weeklyExcelRows(s){const person=id=>s.members.find(m=>m.id===id)?.name||'미등록';return {
  tasks:[['구분/플랫폼명','업무내용','상태','목표 일정','진행률','업무담당자','주요성과','서비스','업무 ID'],...s.reports.flatMap(r=>r.items.map(i=>[i.project,i.title,i.state,i.target_date?new Date(i.target_date+'T00:00:00Z'):null,i.progress/100,person(r.user_id),i.result||'',i.service||'',i.id||''])).sort((a,b)=>a[0].localeCompare(b[0],'ko'))],
  issues:[['보고자','금주 이슈 및 대응','소속'],...reporterNotes(s,'issues').map(r=>[r.name,r.text,r.team])],
@@ -16,7 +16,7 @@ export function weeklyExcelLayout(s){
  const rows=[],data=weeklyExcelRows(s),summary=s.metrics||emptyMetrics(s.week);let cursor=5;
  const add=(values,spans=full,kind='body',formats=[])=>{const chunks=values.map((value,i)=>splitExcelText(value,capacity(spans[i]))),count=Math.max(1,...chunks.map(c=>c.length));for(let part=0;part<count;part++){const cells=spans.map(([from,to],i)=>({from,to,value:chunks[i]?.[part]??'',numFmt:formats[i]}));const lines=Math.max(1,...cells.map(c=>wrappedLines(c.value instanceof Date?'2026-12-31':c.value,capacity([c.from,c.to]))));rows.push({row:cursor++,kind,cells,height:Math.max(26.1,Math.min(409.5,lines*bodyLine+8))});}};
  const text=(value,kind='body')=>add([value],full,kind),gap=()=>{rows.push({row:cursor++,kind:'gap',height:16,cells:[]});};
- const stats=weeklyStats(s);text(weeklySectionTitles[0],'section');text('기간: '+s.week+' ~ '+dayShift(s.week,6)+' · 제출 마감: '+dayShift(s.week,4)+' 금요일');text('보고 인원 '+stats.people+'명'+(stats.members?' / '+stats.members+'명':'')+' · 주요 업무 '+stats.items+'건 · 완료 '+stats.done+'건 · 진행 '+stats.doing+'건 · 보류 '+stats.hold+'건');gap();
+ const stats=weeklyStats(s);text(weeklySectionTitles[0],'section');text('기간: '+s.week+' ~ '+dayShift(s.week,6)+' · 제출 마감: '+dayShift(s.week,4)+' 금요일');{const overview=weeklyOverview(s);if(overview.rows.length){add(['구분','핵심 내용'],[[2,4],[5,14]],'tableHeader');for(const r of overview.rows)add([r.area,r.text],[[2,4],[5,14]]);}else text(overviewMessage(overview.status));}text('보고 인원 '+stats.people+'명'+(stats.members?' / '+stats.members+'명':'')+' · 주요 업무 '+stats.items+'건 · 완료 '+stats.done+'건 · 진행 '+stats.doing+'건 · 보류 '+stats.hold+'건');gap();
  text(metricsHeading,'section');
  metricTitles.forEach((title,index)=>{
   const part=summary.sections?.[index]||{};text(title,'subsection');text('집계 기간: '+(part.period||s.week+' ~ '+dayShift(s.week,6)));
