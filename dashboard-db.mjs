@@ -20,37 +20,89 @@ summary.sections[2].platform_details=details;summary.sections[2].platform_notes=
 export async function loadDatabaseMetrics(week,options={}){let rows;if(options.records)rows=options.records;else{const db=await dashboardClient();const session=await dashboardSession();if(!session)throw Error('통계 DB 계정으로 연결해주세요.');const result=await db.from('datasets').select('key,data,fetched_at').in('key',dashboardKeys(week));if(result.error)throw Error('통계 DB 조회 실패: '+result.error.message);rows=result.data||[];}const summary=databaseSummary(rows,week);try{summary.sections[1]=await (options.seminar||loadSeminarMetrics)(week)}catch(err){summary.sections[1].note='세미나 조회 실패: '+err.message}return summary;}
 
 
+// ---- 월간 지표: 통합 통계(Dashboard_DV) 리포트 저장본(report|svc|생성시각)의 월간 지표 정의를 그대로 사용 ----
+// 집계 방식은 통계 사이트 리포트(rSum·rLevel·rAvg)와 동일: 합계(sum)·기말(level)·평균(avg)
+const DAY=86400000;
+const dn=s=>Math.floor(Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10))/DAY);
+const ds=n=>new Date(n*DAY).toISOString().slice(0,10);
+export const monthEnd=ym=>new Date(Date.UTC(+ym.slice(0,4),+ym.slice(5,7),0)).toISOString().slice(0,10);
+export function previousMonth(ym){const d=new Date(ym+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);return d.toISOString().slice(0,7);}
+export function unpackSource(p){
+ if(!p)return null;const src={m:[],w:[],d:[]};let last='';
+ const push=(g,s,e,v)=>{v=numberValue(v);if(v===null||!/^\d{4}-\d{2}-\d{2}$/.test(s||''))return;src[g].push({s,e,a:dn(s),b:dn(e),v});if(e>last)last=e;};
+ for(const [ym,v] of p.m||[])push('m',ym+'-01',monthEnd(ym),v);
+ for(const [d,v] of p.w||[])push('w',d,ds(dn(d)+6),v);
+ for(const [d,v] of p.d||[])push('d',d,d,v);
+ src.end=p.end||last||null;src.en=src.end?dn(src.end):-1e9;return src;
+}
+function sumOf(src,a,b){
+ const b2=Math.min(b,src.en);if(b2<a)return {val:null,a,b:b2,est:0,miss:b-a+1,none:true};
+ const n=b2-a+1,cov=new Uint8Array(n);let val=0,any=false,est=0;
+ for(const g of ['m','w','d'])for(const it of src[g]){if(it.a<a||it.b>b2)continue;let taken=false;for(let x=it.a;x<=it.b;x++)if(cov[x-a]){taken=true;break;}if(taken)continue;for(let x=it.a;x<=it.b;x++)cov[x-a]=1;val+=it.v;any=true;}
+ for(const g of ['d','w','m'])for(const it of src[g]){if(it.b>src.en||it.b<a||it.a>b2)continue;const len=it.b-it.a+1;for(let x=Math.max(it.a,a);x<=Math.min(it.b,b2);x++)if(!cov[x-a]){cov[x-a]=2;val+=it.v/len;est++;any=true;}}
+ let miss=0;for(let i=0;i<n;i++)if(!cov[i])miss++;
+ return {val:any?val:null,a,b:b2,est,miss:miss+(b-b2)};
+}
+const AVG={dau:[['d',1],['w',1],['m',1]],wau:[['w',4]],mau:[['m',15],['w',4]],mavg:[['m',15]]};
+function avgOf(src,a,b,how){
+ const b2=Math.min(b,src.en);if(b2<a)return {val:null,a,b:b2,none:true};
+ if(how==='dau'&&!src.d.length){const fm=src.m.filter(it=>it.a>=a&&it.b<=b2);let days=0,sv=0;for(const it of fm){const len=it.b-it.a+1;days+=len;sv+=it.v*len;}if(fm.length&&days===b2-a+1)return {val:sv/days,a,b:b2,g:'m',cnt:fm.length};}
+ for(const [g,minO] of AVG[how]||AVG.mavg){let sw=0,sv=0,cnt=0;for(const it of src[g]){if(it.b>src.en)continue;const o=Math.min(it.b,b2)-Math.max(it.a,a)+1;if(o<minO)continue;const w=how==='dau'?o:1;sw+=w;sv+=it.v*w;cnt++;}if(sw)return {val:sv/sw,a,b:b2,g,cnt};}
+ return {val:null,a,b:b2};
+}
+function levelOf(src,a,b){const b2=Math.min(b,src.en);let best=null;for(const g of ['m','w','d'])for(const it of src[g])if(it.b<=b2&&it.b>=a-31&&(!best||it.b>=best.b))best=it;return {val:best?best.v:null,a,b:b2,at:best?best.e:null,none:!best};}
+export function evaluateMetric(mt,a,b){if(!mt?.src)return null;const r=mt.kind==='sum'?sumOf(mt.src,a,b):mt.kind==='avg'?avgOf(mt.src,a,b,mt.how):levelOf(mt.src,a,b);
+ // 통계 사이트와 같이 기간의 절반 이상 미집계인 합계는 값으로 쓰지 않음
+ if(mt.kind==='sum'&&r.val!==null&&r.miss>(b-a+1)/2)r.val=null;return r;}
+export const metricGroups=[['회원',['total','newM','gaMem']],['활동성',['mau','dau','wau','views','visits','newU']],['포인트',['earn','use','cancel','expire','bal']],['매출',['sales']]];
+const groupOf=key=>metricGroups.find(([,keys])=>keys.includes(key))?.[0]||'기타';
+const orderOf=key=>{const flat=metricGroups.flatMap(([,k])=>k),i=flat.indexOf(key);return i<0?999:i;};
+// 선택 월과 직전 월 비교. 진행 중인 달의 합계 지표는 직전 월의 같은 기간(1~D일)과 비교합니다.
+export function monthlyMetricRow(key,def,platform,month){
+ const mt={kind:def.kind||'level',how:def.how||undefined,src:unpackSource(def.src)},label=String(def.label||key),unit=String(def.unit||'');
+ const row={key,label,platform,group:groupOf(key),kind:mt.kind,unit,value:null,previous:null,partial:false,through:'',basis:'month',note:''};
+ if(!mt.src){row.note='원천 자료 없음';return row;}
+ const ms=dn(month+'-01'),me=dn(monthEnd(month)),cur=evaluateMetric(mt,ms,me);
+ const pm=previousMonth(month);let pa=dn(pm+'-01'),pb=dn(monthEnd(pm));
+ if(cur&&cur.b>=ms&&cur.b<me){row.partial=true;row.through=ds(cur.b);if(mt.kind==='sum'){pb=Math.min(pb,pa+(cur.b-ms));row.basis='same-days';}}
+ const prev=evaluateMetric(mt,pa,pb);
+ row.value=cur?.val??null;row.previous=prev?.val??null;
+ if(cur?.est)row.note=cur.est+'일 일할 추정';
+ if(row.value===null)row.note=cur?.none?'선택 월 자료 없음':'선택 월 집계 부족';
+ return row;
+}
 export function monthlyDatabaseSummary(records,month,seminars){
- const prev=new Date(month+'-01T12:00:00Z');prev.setUTCMonth(prev.getUTCMonth()-1);const previous=prev.toISOString().slice(0,7);
- const summary=emptyMetrics(month+'-01');summary.month=month;summary.trends=[];summary.source='Dashboard_DV.datasets';summary.fetched_at=new Date().toISOString();
- const sections=summary.sections;sections.forEach(s=>{s.period=month;s.rows=[];s.note='선택 월과 직전 월의 원본 집계 값입니다.';});
+ const previous=previousMonth(month);
+ const summary=emptyMetrics(month+'-01');summary.month=month;summary.previous_month=previous;summary.source='Dashboard_DV.datasets · report';summary.fetched_at=new Date().toISOString();summary.packs=[];
+ const sections=summary.sections;sections.forEach(s=>{s.period=month;s.rows=[];s.note='';});
  for(const [svc,platform] of [['dv','닥터빌'],['pv','팜빌']]){
   const record=records.find(r=>String(r.key).startsWith('report|'+svc+'|')&&r.data?.m);
-  const data=record?.data;
-  for(const [key,index] of [['sales',0],['newM',0],['total',0],['dau',0],['mau',0],['views',0],['earn',2],['use',2],['expire',2],['bal',2]]){
-   const metric=data?.m?.[key];if(!metric)continue;
-   const value=m=>{const values=(metric.src?.m||[]).filter(x=>String(x[0]).slice(0,7)===m);return values.length?numberValue(values.at(-1)[1]):null};
-   sections[index].rows.push({label:metric.label||key,platform,value:value(month),previous:value(previous),unit:metric.unit||''});
-   const year=Number(month.slice(0,4)),last=Number(month.slice(5,7));summary.trends.push({label:metric.label||key,platform,unit:metric.unit||'',months:Array.from({length:last},(_,i)=>String(i+1).padStart(2,'0')),current:Array.from({length:last},(_,i)=>value(year+'-'+String(i+1).padStart(2,'0'))),previous:Array.from({length:last},(_,i)=>value((year-1)+'-'+String(i+1).padStart(2,'0')))});
+  summary.packs.push({platform,key:record?.key||'',generated_at:record?.data?.generatedAt||record?.fetched_at||'',anchor:record?.data?.anchor||''});
+  if(!record)continue;
+  // 세미나는 Google Sheets 원본을 직접 집계하므로 통계 리포트의 '세미나 진행'은 제외합니다.
+  for(const key of Object.keys(record.data.m).filter(k=>k!=='sem').sort((a,b)=>orderOf(a)-orderOf(b))){
+   const row=monthlyMetricRow(key,record.data.m[key],platform,month);sections[row.group==='포인트'?2:0].rows.push(row);
   }
-  sections[0].platform_notes||={};sections[0].platform_notes[platform]=record?'통합 DB 보고서 저장본 · '+(record.fetched_at||''):'통합 DB 보고서 저장본을 찾지 못했습니다.';
  }
+ sections[0].note=summary.packs.map(p=>p.platform+': '+(p.key?'통합 통계 리포트 '+(p.generated_at||'')+' 생성본':'통합 통계 리포트 저장본 없음')).join(' · ');
+ sections[2].note=sections[0].note;
  const complete=r=>r[7]===true||/^(true|완료|y|예|1)$/i.test(String(r[7]).trim());
  const selected=m=>(seminars||[]).filter(r=>String(r[0]).slice(0,7)===m);
  const stat=(m,pv)=>{const rows=selected(m).filter(r=>!pv||numberValue(r.pv_signup)!==null||numberValue(r.pv_view)!==null),done=rows.filter(complete);
-  const vals=(index)=>done.map(r=>numberValue(pv?(index===8?r.pv_signup:r.pv_view):r[index])).filter(x=>x!==null);
+  const vals=index=>done.map(r=>numberValue(pv?(index===8?r.pv_signup:r.pv_view):r[index])).filter(x=>x!==null);
   const sum=i=>{const v=vals(i);return v.length?v.reduce((a,b)=>a+b,0):done.length?null:0};
   const avg=i=>{const v=vals(i);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
   return {done,values:[rows.length,done.length,sum(8),sum(9),avg(10),avg(11)]};
  };
  const detail=[];
  for(const [platform,pv] of [['닥터빌',false],['팜빌',true]]){
-  const now=stat(month,pv),before=stat(previous,pv);if(pv&&!(seminars||[]).some(r=>numberValue(r.pv_signup)!==null||numberValue(r.pv_view)!==null))continue;
-  const labels=[['편성 건수','건'],['완료 건수','건'],['신청자 수 합계','명'],['시청자 수 합계','명'],['평균 만족도','점'],['평균 유용도','점']];
-  sections[1].rows.push(...labels.slice(0,pv?4:6).map(([label,unit],i)=>({label,unit,platform,value:now.values[i],previous:before.values[i]})));
-  detail.push({platform,detail_title:platform+' · 완료 강의 상세',detail_headers:['강의명','연자명','신청자 수','시청자 수','만족도','유용도'],detail_rows:now.done.map(r=>[r.title||'미입력',r.speaker||'미입력',...(pv?[r.pv_signup,r.pv_view,null,null]:[r[8],r[9],r[10],r[11]]).map(x=>numberValue(x)??'미입력')])});
+  if(pv&&!(seminars||[]).some(r=>numberValue(r.pv_signup)!==null||numberValue(r.pv_view)!==null))continue;
+  const now=stat(month,pv),before=stat(previous,pv);
+  const labels=[['편성 건수','건','sum'],['완료 건수','건','sum'],['신청자 수 합계','명','sum'],['시청자 수 합계','명','sum'],['평균 만족도','점','avg'],['평균 유용도','점','avg']];
+  sections[1].rows.push(...labels.slice(0,pv?4:6).map(([label,unit,kind],i)=>({key:'seminar'+i,label,unit,kind,platform,group:'세미나',value:now.values[i],previous:before.values[i],partial:false,basis:'month',note:''})));
+  detail.push({platform,detail_title:platform+' · 완료 강의 상세',detail_headers:['강의일','강의명','연자명','신청자 수','시청자 수','만족도','유용도'],detail_rows:now.done.map(r=>[String(r[0]||''),r.title||'미입력',r.speaker||'미입력',...(pv?[r.pv_signup,r.pv_view,null,null]:[r[8],r[9],r[10],r[11]]).map(x=>numberValue(x)??'-')])});
  }
- sections[1].platform_details=detail;sections[1].note='Google Sheets Raw 강의일 기준 월별 집계 · 완료 강의 기준 신청·시청 합계와 평균 점수';
+ sections[1].platform_details=detail;sections[1].note='비학술 세미나 Google Sheets raw · 강의일 기준 월 집계 · 완료 강의의 신청·시청 합계와 평균 점수';
  return summary;
 }
 export async function loadMonthlyDatabaseMetrics(month,options={}){

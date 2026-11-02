@@ -6,5 +6,5 @@ test('월 경계 보고는 작성일 기준으로 포함하며 기존 작성일 
 test('원문 펼쳐보기는 요약 누락 여부를 확인할 수 있게 보존하고 HTML을 안전하게 처리한다',()=>{
  const report={id:'one',user_id:'u',week_start:'2026-11-02',items:[{id:'t',title:'<업무>',state:'진행',progress:50,result:'성과 원문'}],issues:'이슈 원문',next_plan:'계획 원문'};
  const html=monthlyPerformanceBody({month:'2026-11',reports:[report],members:[{id:'u',name:'담당자'}],ai_summary:{done:[],todo:[]}});
- for(const text of ['성과 원문','이슈 원문','계획 원문','&lt;업무&gt;','펼쳐보기'])assert.ok(html.includes(text));assert.ok(!html.includes('<업무>'));
+ for(const text of ['성과 원문','이슈 원문','계획 원문','&lt;업무&gt;','주간 보고 원문'])assert.ok(html.includes(text));assert.ok(!html.includes('<업무>'));
 });

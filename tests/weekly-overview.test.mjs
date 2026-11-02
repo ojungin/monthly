@@ -5,7 +5,7 @@ const empty=()=>({issues:[],plans:[],done:[],todo:[],metrics:[]});
 const snap=ai=>({week:'2026-10-05',created_at:'2026-10-10',author:'팀장',members:[{id:'u',name:'보고자'}],metrics:emptyMetrics('2026-10-05'),reports:[{id:'r',user_id:'u',week_start:'2026-10-05',items:[{id:'t',project:'운영',title:'업무',state:'진행',progress:50,result:'성과'}],issues:'이슈',next_plan:'계획'}],...(ai?{ai_summary:ai}:{})});
 test('overview schema is source-bound and validation requires report sources except for metrics',()=>{
  const schema=sourceBoundSchema(['r']);assert.ok(schema.required.includes('overview'));const row=schema.properties.overview.items;
- assert.deepEqual(row.properties.area.enum,['주요 지표','주요 업무','금주 이슈 및 대응']);assert.deepEqual(row.properties.report_ids.items.enum,['r']);assert.equal(schema.properties.overview.maxItems,9);
+ assert.deepEqual(row.properties.area.enum,['주요 지표','주요 업무','금주 이슈 및 대응','한 일','할 일']);assert.deepEqual(row.properties.report_ids.items.enum,['r']);assert.equal(schema.properties.overview.maxItems,9);
  assert.equal(validSummary({...empty(),overview:[{area:'주요 지표',summary:'닥터빌 MAU 120명, 전주 대비 +20명',report_ids:[]},{area:'주요 업무',summary:'운영 업무를 진행하고 있습니다.',report_ids:['r']}]},['r']).overview.length,2);
  assert.throws(()=>validSummary({...empty(),overview:[{area:'주요 업무',summary:'근거 없음',report_ids:[]}]},['r']),/핵심 요약/);
  assert.throws(()=>validSummary({...empty(),overview:[{area:'차주 계획',summary:'영역 외',report_ids:['r']}]},['r']),/핵심 요약/);
