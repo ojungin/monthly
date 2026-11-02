@@ -99,11 +99,11 @@ export function monthlyReportModel(s){
  if(reports.length)appendix.push({title:'주간 보고 제출 현황',head:['작성일','보고 주간','보고자','업무 수'],rows:reports.map(r=>[dot(r.report_date||r.week_start),dot(r.week_start)+' 주',person(r.user_id),(r.items||[]).length+'건'])});
  for(const d of s.metrics?.sections?.[1]?.platform_details||[])if(d.detail_rows?.length)appendix.push({title:'비학술 세미나 완료 강의 · '+d.platform,head:d.detail_headers,rows:d.detail_rows.map(r=>r.map(x=>typeof x==='number'?x.toLocaleString('ko-KR',{maximumFractionDigits:2}):String(x??'')))});
  if(reports.length)appendix.push({title:'주간 보고 원문',head:['작성일','보고자','주요 업무 · 성과','금주 이슈 및 대응','차주 계획'],wide:true,rows:reports.map(r=>[dot(r.report_date||r.week_start),person(r.user_id),(r.items||[]).map(i=>'['+(i.project||'')+'] '+(i.title||'')+' ('+(i.state||'')+' '+(i.progress??'')+'%)'+(String(i.result||'').trim()?'\n'+String(i.result).trim():'')).join('\n'),String(r.issues||'').trim()||'없음',String(r.next_plan||'').trim()||'없음'])});
- return {title:month.slice(0,4)+'년 '+monthNo(month)+'월 업무 성과 보고의 건',dateLine:'보고일 : '+korDate(s.created_at),metaLine:'보고기간 : '+dot(month+'-01')+' ~ '+dot(month+'-'+pad(lastDay(month)))+' · 작성 : '+(s.author||''),
-  summaryTitle:'1. 보고 요약',summary:summaryLines(s),summaryNote:!ai?'※ 요약 미생성 · 보고서 생성 또는 요약 재시도를 실행하면 GPT 요약으로 바뀜':legacyAI?'※ 이전 양식으로 생성된 문서임 · 보고서를 다시 생성하면 새 요약이 포함됨':'',sections,appendix};
+ return applyEdits(s,{title:month.slice(0,4)+'년 '+monthNo(month)+'월 업무 성과 보고의 건',dateLine:'보고일 : '+korDate(s.created_at),metaLine:'보고기간 : '+dot(month+'-01')+' ~ '+dot(month+'-'+pad(lastDay(month)))+' · 작성 : '+(s.author||''),
+  summaryTitle:'1. 보고 요약',summary:summaryLines(s),summaryNote:!ai?'※ 요약 미생성 · 보고서 생성 또는 요약 재시도를 실행하면 GPT 요약으로 바뀜':legacyAI?'※ 이전 양식으로 생성된 문서임 · 보고서를 다시 생성하면 새 요약이 포함됨':'',sections,appendix});
 }
 
-export const monthlyReportStyles='.rdoc{background:#fff;color:#111;max-width:794px;margin:0 auto;padding:48px 56px;border:1px solid #d9dde3;font-size:14.5px;line-height:1.7;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;box-sizing:border-box}.rdoc *{box-sizing:border-box}.rdoc .rd-title{text-align:center;font-size:19px;font-weight:700;margin:0 0 18px;letter-spacing:-.01em;word-break:keep-all;color:#111;border:0;padding:0}.rdoc .rd-meta{text-align:right;font-weight:700;margin:0;font-size:14px}.rdoc .rd-box{background:#EDEDED;border:1px solid #9a9a9a;padding:12px 16px;margin:18px 0 8px}.rdoc .rd-boxh{font-weight:700;margin:0 0 6px}.rdoc .rd-sum{margin:0 0 6px;padding-left:1.4em;text-indent:-1.4em;word-break:break-word}.rdoc .rd-h{font-size:14.5px;font-weight:700;margin:22px 0 8px;color:#111;border:0;padding:0}.rdoc p{margin:0;white-space:pre-wrap}.rdoc .rb-cat{font-weight:700;margin:12px 0 4px;color:#13213b}.rdoc .rb-goal{font-weight:700;margin:6px 0 3px;padding-left:.6em}.rdoc .rb-p{margin:0 0 3px;padding-left:1.6em;word-break:break-word}.rdoc .rb-item{margin:0 0 2px;padding-left:3.4em;text-indent:-1.6em;word-break:break-word}.rdoc .rb-num{margin:0 0 4px;padding-left:2.2em;text-indent:-1.2em;word-break:break-word}.rdoc .rb-note{margin:0 0 4px;padding-left:2.2em;font-size:11.5px;color:#555}.rdoc .rb-gap{height:6px}.rdoc .rd-th{font-weight:700;margin:14px 0 6px}.rdoc .tblwrap{overflow-x:auto}.rdoc .rd-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}.rdoc .rd-tbl th,.rdoc .rd-tbl td{border:1px solid #808080;padding:5px 7px;vertical-align:top;color:#111;white-space:pre-wrap;word-break:break-word}.rdoc .rd-tbl th{background:#EDEDED;font-weight:700;text-align:center;white-space:nowrap}.rdoc .rd-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rdoc .rd-tbl.wide{font-size:11px}.rdoc .rd-tbl.wide th,.rdoc .rd-tbl.wide td{white-space:pre-wrap}@media(max-width:600px){.rdoc{padding:22px 16px}.rdoc .rd-tbl{font-size:11px}}@media print{.rdoc{border:0;padding:0;max-width:none}.rdoc tr,.rdoc .rd-box{break-inside:avoid}.rdoc .rd-h,.rdoc .rd-th{break-after:avoid}}';
+export const monthlyReportStyles='.rdoc{background:#fff;color:#111;max-width:794px;margin:0 auto;padding:48px 56px;border:1px solid #d9dde3;font-size:14.5px;line-height:1.7;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;box-sizing:border-box}.rdoc *{box-sizing:border-box}.rdoc .rd-title{text-align:center;font-size:19px;font-weight:700;margin:0 0 18px;letter-spacing:-.01em;word-break:keep-all;color:#111;border:0;padding:0}.rdoc .rd-meta{text-align:right;font-weight:700;margin:0;font-size:14px}.rdoc .rd-box{background:#EDEDED;border:1px solid #9a9a9a;padding:12px 16px;margin:18px 0 8px}.rdoc .rd-boxh{font-weight:700;margin:0 0 6px}.rdoc .rd-sum{margin:0 0 6px;padding-left:1.4em;text-indent:-1.4em;word-break:break-word}.rdoc .rd-h{font-size:14.5px;font-weight:700;margin:22px 0 8px;color:#111;border:0;padding:0}.rdoc p{margin:0;white-space:pre-wrap}.rdoc .rb-cat{font-weight:700;margin:12px 0 4px;color:#13213b}.rdoc .rb-goal{font-weight:700;margin:6px 0 3px;padding-left:.6em}.rdoc .rb-p{margin:0 0 3px;padding-left:1.6em;word-break:break-word}.rdoc .rb-item{margin:0 0 2px;padding-left:3.4em;text-indent:-1.6em;word-break:break-word}.rdoc .rb-bul{margin:0 0 3px;padding-left:3.4em;text-indent:-.8em;word-break:break-word}.rdoc .rb-num{margin:0 0 4px;padding-left:2.2em;text-indent:-1.2em;word-break:break-word}.rdoc .rb-note{margin:0 0 4px;padding-left:2.2em;font-size:11.5px;color:#555}.rdoc .rb-gap{height:6px}.rdoc .rd-th{font-weight:700;margin:14px 0 6px}.rdoc .tblwrap{overflow-x:auto}.rdoc .rd-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}.rdoc .rd-tbl th,.rdoc .rd-tbl td{border:1px solid #808080;padding:5px 7px;vertical-align:top;color:#111;white-space:pre-wrap;word-break:break-word}.rdoc .rd-tbl th{background:#EDEDED;font-weight:700;text-align:center;white-space:nowrap}.rdoc .rd-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rdoc .rd-tbl.wide{font-size:11px}.rdoc .rd-tbl.wide th,.rdoc .rd-tbl.wide td{white-space:pre-wrap}@media(max-width:600px){.rdoc{padding:22px 16px}.rdoc .rd-tbl{font-size:11px}}@media print{.rdoc{border:0;padding:0;max-width:none}.rdoc tr,.rdoc .rd-box{break-inside:avoid}.rdoc .rd-h,.rdoc .rd-th{break-after:avoid}}';
 const lineHTML=l=>l.t==='gap'?'<div class="rb-gap"></div>':'<p class="rb-'+l.t+'">'+e(l.text)+'</p>';
 const tableHTML=(t,i)=>'<p class="rd-th">'+(i===undefined?'':(i+1)+'. ')+e(t.title)+'</p><div class="tblwrap"><table class="rd-tbl'+(t.wide?' wide':'')+'"><thead><tr>'+t.head.map(h=>'<th>'+e(h)+'</th>').join('')+'</tr></thead><tbody>'+(t.rows.length?t.rows.map(row=>'<tr>'+row.map((c,ci)=>'<td'+(t.numeric?.includes(ci)?' class="num"':'')+'>'+e(c)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+t.head.length+'">자료 없음</td></tr>')+'</tbody></table></div>';
 export function monthlyReportBody(s){
@@ -124,10 +124,74 @@ export function monthlyReportDocx(D,s){
  const kids=[para(r.title,{size:28,bold:true,align:AlignmentType.CENTER,after:200}),para(r.dateLine,{bold:true,align:AlignmentType.RIGHT,after:40}),para(r.metaLine,{bold:true,align:AlignmentType.RIGHT,after:200})];
  kids.push(new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({children:[new TableCell({borders,shading:{type:ShadingType.CLEAR,color:'auto',fill:G},margins:{top:120,bottom:120,left:160,right:160},
   children:[para('■ '+r.summaryTitle,{bold:true,after:100}),...(r.summary.length?r.summary:['요약할 내용이 없음']).map((x,i)=>para((i+1)+'. '+x,{after:80,indent:{left:300,hanging:300}})),...(r.summaryNote?[para(r.summaryNote,{size:17,color:'555555'})]:[])]})]})]}));
- const line=l=>l.t==='gap'?para('',{after:40}):l.t==='cat'?para(l.text,{bold:true,before:160,after:60}):l.t==='goal'?para(l.text,{bold:true,before:100,after:40,indent:{left:200}}):l.t==='item'?para(l.text,{indent:{left:900,hanging:380}}):l.t==='num'?para(l.text,{indent:{left:400,hanging:280}}):l.t==='note'?para(l.text,{size:17,color:'555555',indent:{left:400}}):para(l.text,{indent:{left:500}});
+ const line=l=>l.t==='gap'?para('',{after:40}):l.t==='cat'?para(l.text,{bold:true,before:160,after:60}):l.t==='goal'?para(l.text,{bold:true,before:100,after:40,indent:{left:200}}):l.t==='item'?para(l.text,{indent:{left:900,hanging:380}}):l.t==='num'?para(l.text,{indent:{left:400,hanging:280}}):l.t==='bul'?para(l.text,{indent:{left:900,hanging:200}}):l.t==='note'?para(l.text,{size:17,color:'555555',indent:{left:400}}):para(l.text,{indent:{left:500}});
  const tbl=t=>{const sz=t.head.length>6?16:18;const cell=(txt,head,ci)=>new TableCell({borders,shading:head?{type:ShadingType.CLEAR,color:'auto',fill:G}:undefined,margins:{top:30,bottom:30,left:60,right:60},children:[new Paragraph({alignment:head?AlignmentType.CENTER:(t.numeric?.includes(ci)?AlignmentType.RIGHT:undefined),children:String(txt??'').split('\n').map((x,i)=>new TextRun({text:x,font:F,size:sz,bold:head,break:i?1:0}))})]});
   return new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({tableHeader:true,children:t.head.map((h,ci)=>cell(h,true,ci))}),...(t.rows.length?t.rows:[['자료 없음',...t.head.slice(1).map(()=>'')]]).map(row=>new TableRow({cantSplit:true,children:row.map((c,ci)=>cell(c,false,ci))}))]});};
  for(const sec of r.sections){kids.push(para(sec.title,{bold:true,before:280,after:100}));kids.push(...sec.body.map(line));for(const t of sec.tables||[]){kids.push(para(t.title,{bold:true,before:160,after:80,size:20}));kids.push(tbl(t));}}
  if(r.appendix.length){kids.push(para('■ 참고자료',{bold:true,before:320,after:120}));r.appendix.forEach((t,i)=>{kids.push(para((i+1)+'. '+t.title,{bold:true,before:160,after:80}));kids.push(tbl(t));});}
  return new Document({styles:{default:{document:{run:{font:F,size:22}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1701,bottom:1701,left:1440,right:1440}}},children:kids}]});
+}
+
+// ---- 편집기: tf-worklog 편집 화면과 같은 본문 표기 ----
+// [분류] · 1. 업무 · (1) 세부 항목 · ① 번호 항목 · - 하위 항목 · ※ 주석 · 그 외 일반 문단 · 빈 줄은 간격
+const LINE_TYPES=['cat','goal','p','item','num','note','bul','gap'];
+export function linesToText(body){return (body||[]).map(l=>l.t==='gap'?'':l.t==='bul'?'- '+String(l.text||'').replace(/^·\s*/,''):String(l.text||'')).join('\n').replace(/\n+$/,'');}
+export function textToLines(text){
+ const out=[];
+ for(const raw of String(text||'').replace(/\r/g,'').split('\n')){const t=raw.trim();
+  if(!t){if(out.length&&out.at(-1).t!=='gap')out.push({t:'gap'});continue;}
+  out.push(/^\[[^\]]+\]$/.test(t)?{t:'cat',text:t}:/^\d+\.\s/.test(t)?{t:'goal',text:t}:/^\(\d+\)/.test(t)?{t:'item',text:t}:/^[①-⑳]/.test(t)?{t:'num',text:t}:/^※/.test(t)?{t:'note',text:t}:/^[-•·]\s*/.test(t)?{t:'bul',text:'· '+t.replace(/^[-•·]\s*/,'')}:{t:'p',text:t});
+ }
+ while(out.length&&out.at(-1).t==='gap')out.pop();return out;
+}
+const str=(v,n=5000)=>String(v??'').slice(0,n);
+const arr=(v,n)=>Array.isArray(v)?v.slice(0,n):[];
+// 저장된 편집본은 형식을 다시 검사한 뒤에만 사용합니다.
+export function sanitizeEdits(x){
+ if(!x||typeof x!=='object')return null;
+ return {title:str(x.title,300),dateLine:str(x.dateLine,300),metaLine:str(x.metaLine,300),summary:arr(x.summary,30).map(v=>str(v,2000).trim()).filter(Boolean),
+  sections:arr(x.sections,3).map(sec=>({body:arr(sec?.body,800).filter(l=>LINE_TYPES.includes(l?.t)).map(l=>l.t==='gap'?{t:'gap'}:{t:l.t,text:str(l.text,3000)}),
+   tables:arr(sec?.tables,20).map(t=>{const head=arr(t?.head,12).map(h=>str(h,100));return {title:str(t?.title,200),head,numeric:arr(t?.numeric,12).filter(Number.isInteger),rows:arr(t?.rows,300).map(r=>head.map((_,i)=>str(Array.isArray(r)?r[i]:'',2000)))};})}))};
+}
+function applyEdits(s,model){
+ const ed=sanitizeEdits(s.edited?.model);if(!ed)return model;
+ model.title=ed.title||model.title;model.dateLine=ed.dateLine||model.dateLine;model.metaLine=ed.metaLine||model.metaLine;model.summary=ed.summary;model.summaryNote='';
+ ed.sections.forEach((sec,i)=>{if(model.sections[i]){model.sections[i].body=sec.body;model.sections[i].tables=sec.tables;}});
+ model.edited={at:s.edited.edited_at||'',by:s.edited.edited_by||''};return model;
+}
+export function editorState(s){
+ const m=monthlyReportModel(s);
+ return {docId:s.id||'',title:m.title,dateLine:m.dateLine,metaLine:m.metaLine,summary:m.summary.join('\n'),advisory:String(s.advisory_request||''),edited:!!m.edited,
+  sections:m.sections.slice(0,3).map(sec=>({title:sec.title,body:linesToText(sec.body),tables:(sec.tables||[]).map(t=>({title:t.title,head:[...t.head],numeric:[...(t.numeric||[])],rows:t.rows.map(r=>[...r])}))}))};
+}
+export function monthlyEditorHTML(st){
+ const ta=(attr,val,rows)=>'<textarea '+attr+' rows="'+rows+'">'+e(val)+'</textarea>';
+ const rowsFor=v=>Math.min(22,Math.max(4,String(v).split('\n').length+1));
+ return '<form id="monthly-editor" class="monthly-editor"><p class="muted">본문 표기: <b>[분류]</b> · <b>1. 업무</b> · <b>(1) 세부 항목</b> · <b>① 번호 항목</b> · <b>- 하위 항목</b> · <b>※ 주석</b> · 그 외는 일반 문단. 저장하면 화면·저장소·Word·PDF·HTML에 반영됩니다.</p>'
+  +'<div class="grid"><label>제목<input id="me-title" value="'+e(st.title)+'" maxlength="300"></label><label>보고일 줄<input id="me-date" value="'+e(st.dateLine)+'" maxlength="300"></label><label>보고기간 · 작성 줄<input id="me-meta" value="'+e(st.metaLine)+'" maxlength="300"></label></div>'
+  +'<label>1. 보고 요약 (한 줄에 한 항목, 번호는 자동)'+ta('id="me-summary"',st.summary,rowsFor(st.summary))+'</label>'
+  +st.sections.map((sec,i)=>'<section class="me-section"><h3>'+e(sec.title)+'</h3><label>본문'+ta('data-me-body="'+i+'"',sec.body,rowsFor(sec.body))+'</label>'
+   +sec.tables.map((t,ti)=>'<div class="me-table"><label>표 제목<input data-me-ttitle="'+i+':'+ti+'" value="'+e(t.title)+'" maxlength="200"></label><div class="table-wrap"><table><thead><tr>'+t.head.map((h,ci)=>'<th><input aria-label="머리글 '+(ci+1)+'" data-me-head="'+i+':'+ti+':'+ci+'" value="'+e(h)+'"></th>').join('')+'<th></th></tr></thead><tbody>'
+    +t.rows.map((r,ri)=>'<tr>'+r.map((c,ci)=>'<td><input aria-label="'+e(t.head[ci]||'')+' '+(ri+1)+'행" data-me-cell="'+i+':'+ti+':'+ri+':'+ci+'" value="'+e(c)+'"></td>').join('')+'<td><button type="button" class="small" data-me-rowdel="'+i+':'+ti+':'+ri+'" aria-label="'+(ri+1)+'행 삭제">×</button></td></tr>').join('')
+    +'</tbody></table></div><button type="button" class="small" data-me-rowadd="'+i+':'+ti+'">+ 행 추가</button></div>').join('')+'</section>').join('')
+  +'<section class="me-section"><h3>5. 자문 필요 사항</h3><label>한 줄에 한 항목 (번호는 자동)'+ta('id="me-advisory" maxlength="5000"',st.advisory,rowsFor(st.advisory))+'</label></section>'
+  +'<div class="actions right">'+(st.edited?'<button type="button" id="me-reset">생성 원본으로 되돌리기</button>':'')+'<button type="button" id="me-cancel">취소</button><button class="primary" type="submit">편집 저장</button></div></form>';
+}
+export function readMonthlyEditor(root,st){
+ const q=sel=>root.querySelector(sel),next=structuredClone(st);
+ next.title=q('#me-title').value;next.dateLine=q('#me-date').value;next.metaLine=q('#me-meta').value;next.summary=q('#me-summary').value;next.advisory=q('#me-advisory').value;
+ root.querySelectorAll('[data-me-body]').forEach(el=>{next.sections[+el.dataset.meBody].body=el.value;});
+ root.querySelectorAll('[data-me-ttitle]').forEach(el=>{const [i,ti]=el.dataset.meTtitle.split(':').map(Number);next.sections[i].tables[ti].title=el.value;});
+ root.querySelectorAll('[data-me-head]').forEach(el=>{const [i,ti,ci]=el.dataset.meHead.split(':').map(Number);next.sections[i].tables[ti].head[ci]=el.value;});
+ root.querySelectorAll('[data-me-cell]').forEach(el=>{const [i,ti,ri,ci]=el.dataset.meCell.split(':').map(Number);next.sections[i].tables[ti].rows[ri][ci]=el.value;});
+ return next;
+}
+export function editTableRows(st,key,remove){const [i,ti,ri]=key.split(':').map(Number),t=st.sections[i].tables[ti];if(remove)t.rows.splice(ri,1);else t.rows.push(t.head.map(()=>''));return st;}
+export function stateToEdits(st){
+ const edits={title:st.title.trim(),dateLine:st.dateLine.trim(),metaLine:st.metaLine.trim(),summary:st.summary.split('\n').map(x=>x.replace(/^\s*\d+\.\s*/,'').trim()).filter(Boolean),
+  sections:st.sections.map(sec=>({body:textToLines(sec.body),tables:sec.tables.map(t=>({title:t.title.trim(),head:t.head.map(h=>h.trim()),numeric:t.numeric,rows:t.rows.map(r=>r.map(c=>c.trim()))}))}))};
+ if(!edits.summary.length)throw Error('보고 요약을 한 항목 이상 입력해주세요.');
+ const size=new TextEncoder().encode(JSON.stringify(edits)).length;if(size>300000)throw Error('편집 내용이 너무 깁니다. 일부 내용을 줄여주세요.');
+ if(st.advisory.length>5000)throw Error('자문 필요 사항은 5000자 이내로 입력해주세요.');
+ return {edits,advisory:st.advisory};
 }

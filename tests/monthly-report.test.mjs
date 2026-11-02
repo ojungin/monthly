@@ -42,3 +42,38 @@ test('sales rows are never shown, even in previously saved documents',()=>{
  const html=monthlyReportBody({...base(),metrics:{sections:[{rows:[{key:'sales',group:'매출',platform:'닥터빌',label:'매출 (실적)',value:3e8,previous:2e8,unit:'원'},{label:'매출 (실적)',value:1,previous:1,unit:'원'},{key:'mau',group:'활동성',platform:'닥터빌',label:'MAU',value:10,previous:9,unit:'명'}]},{rows:[]},{rows:[]}]}});
  assert.ok(!html.includes('매출'));assert.ok(!html.includes('억원'));assert.ok(html.includes('① 활동성'));
 });
+import {editorState,monthlyEditorHTML,readMonthlyEditor,editTableRows,stateToEdits,textToLines,linesToText,sanitizeEdits} from '../monthly-report.mjs';
+const withMetrics=()=>({...base(),id:'doc',metrics:{sections:[{rows:[{key:'mau',group:'활동성',platform:'닥터빌',label:'MAU',value:120,previous:100,unit:'명',kind:'avg'}]},{rows:[]},{rows:[]}]}});
+test('body markup round-trips through the editor notation',()=>{
+ const text='[플랫폼 운영]\n1. 세미나 운영\n세미나 3건을 운영했음\n(1) 신청 120명\n\n① 번호 항목\n- 하위 항목\n※ 주석';
+ const ls=textToLines(text);assert.deepEqual(ls.map(l=>l.t),['cat','goal','p','item','gap','num','bul','note']);assert.equal(linesToText(ls),text);
+ assert.deepEqual(textToLines('\n\n문단\n\n\n'),[{t:'p',text:'문단'}]);
+});
+test('edits replace summary, body and metric table values everywhere; 자문 stays the single advisory source',()=>{
+ const s=withMetrics();s.advisory_request='예산 검토';let st=editorState(s);
+ st.title='수정 제목';st.summary='1. 직접 쓴 요약\n두 번째';st.sections[0].tables[0].rows[0][3]='125명';st.sections[1].body='[기타]\n1. 직접 정리\n(1) 세부 <내용>';
+ st=editTableRows(st,'0:0',false);st.sections[0].tables[0].rows[1]=['팜빌','신규 지표','1','2','+1','+100.0%',''];
+ const {edits,advisory}=stateToEdits(st);s.edited={model:edits,edited_at:'2026-11-02T14:00:00Z',edited_by:'팀장'};s.advisory_request=advisory;
+ const html=monthlyReportBody(s);for(const t of ['수정 제목','1. 직접 쓴 요약','2. 두 번째','125명','신규 지표','(1) 세부 &lt;내용&gt;','① 예산 검토'])assert.ok(html.includes(t),t);
+ assert.ok(!html.includes('요약 재시도를 실행하면'));assert.ok(!html.includes('<내용>'));
+ const r=monthlyReportModel(s);assert.deepEqual(r.edited,{at:'2026-11-02T14:00:00Z',by:'팀장'});assert.equal(r.appendix[0].title,'주요 업무 현황 (월 내 최신 보고 기준)');
+ const back=editorState(s);assert.equal(back.title,'수정 제목');assert.equal(back.sections[0].tables[0].rows.length,2);
+ assert.equal(editTableRows(back,'0:0:0',true).sections[0].tables[0].rows.length,1);
+});
+test('editor reads every field back from the form and rejects an empty summary',()=>{
+ const st=editorState(withMetrics()),html=monthlyEditorHTML(st);for(const id of ['me-title','me-date','me-meta','me-summary','me-advisory','data-me-body="1"','data-me-cell="0:0:0:3"','data-me-rowadd="0:0"'])assert.ok(html.includes(id),id);
+ const values={'#me-title':'T','#me-date':'D','#me-meta':'M','#me-summary':'요약','#me-advisory':'자문'};
+ const el=(v,data)=>({value:v,dataset:data});
+ const root={querySelector:sel=>({value:values[sel]}),querySelectorAll:sel=>sel==='[data-me-body]'?[el('본문',{meBody:'2'})]:sel==='[data-me-cell]'?[el('999명',{meCell:'0:0:0:3'})]:sel==='[data-me-head]'?[el('당월',{meHead:'0:0:3'})]:[]};
+ const next=readMonthlyEditor(root,st);assert.equal(next.title,'T');assert.equal(next.sections[2].body,'본문');assert.equal(next.sections[0].tables[0].rows[0][3],'999명');assert.equal(next.sections[0].tables[0].head[3],'당월');assert.equal(st.title!=='T',true);
+ assert.throws(()=>stateToEdits({...next,summary:'  \n'}),/보고 요약/);
+});
+test('stored edits are re-validated: unknown line types, extra sections and ragged rows are dropped or normalized',()=>{
+ const ed=sanitizeEdits({title:'x',summary:['a',''],sections:[{body:[{t:'script',text:'bad'},{t:'p',text:'ok'}],tables:[{title:'t',head:['a','b'],rows:[['1','2','3'],['4']]}]},{},{},{}]});
+ assert.equal(ed.sections.length,3);assert.deepEqual(ed.sections[0].body,[{t:'p',text:'ok'}]);assert.deepEqual(ed.sections[0].tables[0].rows,[['1','2'],['4','']]);assert.deepEqual(ed.summary,['a']);assert.equal(sanitizeEdits(null),null);
+});
+test('edit save RPC guards owner/admin, monthly kind and payload size, and can revert to the original',async()=>{
+ const {readFile}=await import('node:fs/promises');const sql=await readFile(new URL('../supabase/report-edits.sql',import.meta.url),'utf8');
+ for(const t of ["d.kind='monthly'","d.created_by=auth.uid() or public.is_admin()","octet_length(edits::text)>300000","d.snapshot-'edited'","security definer","from public,anon"])assert.ok(sql.includes(t),t);
+ const app=await readFile(new URL('../app.js',import.meta.url),'utf8');assert.ok(app.includes("client.rpc('save_report_edits'"));assert.ok(app.includes('report-edits.sql'));
+});
