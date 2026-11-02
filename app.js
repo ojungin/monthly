@@ -6,7 +6,7 @@ import {personalGoalsPage} from './personal-goals.mjs?v=20261014-personal-goals'
 import {teamGoalsPage} from './team-goals.mjs?v=20261014-personal-goals';
 import {dashboardSession,loginDashboard,disconnectDashboard,loadDatabaseMetrics,loadMonthlyDatabaseMetrics} from './dashboard-db.mjs?v=20261102-trends';
 import {emptyMetrics,loadSeminarMetrics,metricTitles,numberValue} from './metrics.mjs?v=20261019-activity-compare';
-import {navigationHTML,kpiMenus,menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261102-trends';
+import {navigationHTML,kpiMenus,menus,shiftDay,calendar,latestDocuments,monthlySnapshot,documentBody,exportDocument} from './portal.mjs?v=20261102-tf-month';
 import {escapeHTML as e,monday,monthReports,summarize,csv,validateItems,canEditReport,latestTeamReports,filterTeamTasks} from './core.mjs?v=20261012-home-accordion';
 import {weeklySnapshot,weeklyBody,weeklyFile} from './weekly.mjs?v=20261102-report-layout';
 const $=s=>document.querySelector(s), root=$('#app');
