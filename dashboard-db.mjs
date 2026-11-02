@@ -19,3 +19,48 @@ summary.sections[2].platform_details=details;summary.sections[2].platform_notes=
 }
 export async function loadDatabaseMetrics(week,options={}){let rows;if(options.records)rows=options.records;else{const db=await dashboardClient();const session=await dashboardSession();if(!session)throw Error('통계 DB 계정으로 연결해주세요.');const result=await db.from('datasets').select('key,data,fetched_at').in('key',dashboardKeys(week));if(result.error)throw Error('통계 DB 조회 실패: '+result.error.message);rows=result.data||[];}const summary=databaseSummary(rows,week);try{summary.sections[1]=await (options.seminar||loadSeminarMetrics)(week)}catch(err){summary.sections[1].note='세미나 조회 실패: '+err.message}return summary;}
 
+
+export function monthlyDatabaseSummary(records,month,seminars){
+ const prev=new Date(month+'-01T12:00:00Z');prev.setUTCMonth(prev.getUTCMonth()-1);const previous=prev.toISOString().slice(0,7);
+ const summary=emptyMetrics(month+'-01');summary.month=month;summary.source='Dashboard_DV.datasets';summary.fetched_at=new Date().toISOString();
+ const sections=summary.sections;sections.forEach(s=>{s.period=month;s.rows=[];s.note='선택 월과 직전 월의 원본 집계 값입니다.';});
+ for(const [svc,platform] of [['dv','닥터빌'],['pv','팜빌']]){
+  const record=records.find(r=>String(r.key).startsWith('report|'+svc+'|')&&r.data?.m);
+  const data=record?.data;
+  for(const [key,index] of [['sales',0],['newM',0],['total',0],['dau',0],['mau',0],['views',0],['earn',2],['use',2],['expire',2],['bal',2]]){
+   const metric=data?.m?.[key];if(!metric)continue;
+   const value=m=>{const values=(metric.src?.m||[]).filter(x=>String(x[0]).slice(0,7)===m);return values.length?numberValue(values.at(-1)[1]):null};
+   sections[index].rows.push({label:metric.label||key,platform,value:value(month),previous:value(previous),unit:metric.unit||''});
+  }
+  sections[0].platform_notes||={};sections[0].platform_notes[platform]=record?'통합 DB 보고서 저장본 · '+(record.fetched_at||''):'통합 DB 보고서 저장본을 찾지 못했습니다.';
+ }
+ const complete=r=>r[7]===true||/^(true|완료|y|예|1)$/i.test(String(r[7]).trim());
+ const selected=m=>(seminars||[]).filter(r=>String(r[0]).slice(0,7)===m);
+ const stat=(m,pv)=>{const rows=selected(m).filter(r=>!pv||numberValue(r.pv_signup)!==null||numberValue(r.pv_view)!==null),done=rows.filter(complete);
+  const vals=(index)=>done.map(r=>numberValue(pv?(index===8?r.pv_signup:r.pv_view):r[index])).filter(x=>x!==null);
+  const sum=i=>{const v=vals(i);return v.length?v.reduce((a,b)=>a+b,0):done.length?null:0};
+  const avg=i=>{const v=vals(i);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+  return {done,values:[rows.length,done.length,sum(8),sum(9),avg(10),avg(11)]};
+ };
+ const detail=[];
+ for(const [platform,pv] of [['닥터빌',false],['팜빌',true]]){
+  const now=stat(month,pv),before=stat(previous,pv);if(pv&&!(seminars||[]).some(r=>numberValue(r.pv_signup)!==null||numberValue(r.pv_view)!==null))continue;
+  const labels=[['편성 건수','건'],['완료 건수','건'],['신청자 수 합계','명'],['시청자 수 합계','명'],['평균 만족도','점'],['평균 유용도','점']];
+  sections[1].rows.push(...labels.slice(0,pv?4:6).map(([label,unit],i)=>({label,unit,platform,value:now.values[i],previous:before.values[i]})));
+  detail.push({platform,detail_title:platform+' · 완료 강의 상세',detail_headers:['강의명','연자명','신청자 수','시청자 수','만족도','유용도'],detail_rows:now.done.map(r=>[r.title||'미입력',r.speaker||'미입력',...(pv?[r.pv_signup,r.pv_view,null,null]:[r[8],r[9],r[10],r[11]]).map(x=>numberValue(x)??'미입력')])});
+ }
+ sections[1].platform_details=detail;sections[1].note='Google Sheets Raw 강의일 기준 월별 집계 · 완료 강의 기준 신청·시청 합계와 평균 점수';
+ return summary;
+}
+export async function loadMonthlyDatabaseMetrics(month,options={}){
+ const {querySeminarSheet,parseGVizResponse,seminarRowsFromTable}=await import('./metrics.mjs?v=20261019-activity-compare');
+ let records=options.records;
+ if(!records){const db=await dashboardClient();if(!await dashboardSession())throw Error('통계 DB 계정을 연결해주세요.');
+  const result=await Promise.all(['dv','pv'].map(svc=>db.from('datasets').select('key,data,fetched_at').like('key','report|'+svc+'|%').order('fetched_at',{ascending:false}).limit(1)));
+  for(const r of result)if(r.error)throw Error('통계 DB 조회 실패: '+r.error.message);
+  records=result.flatMap(r=>r.data||[]);
+ }
+ const response=options.seminars?null:await querySeminarSheet();
+ const rows=options.seminars||seminarRowsFromTable(typeof response==='string'?parseGVizResponse(response):response);
+ return monthlyDatabaseSummary(records,month,rows);
+}

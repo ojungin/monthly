@@ -8,9 +8,9 @@ language plpgsql security definer set search_path='' as $$
 declare result public.report_documents;
 begin
  if not public.is_member() then raise exception '팀원만 문서를 생성할 수 있습니다'; end if;
- if document_kind <> 'weekly' then raise exception '주간 보고에만 지표를 추가할 수 있습니다'; end if;
+ if document_kind not in ('weekly','monthly') then raise exception '잘못된 보고 유형입니다'; end if;
  if metric_summary is null or jsonb_typeof(metric_summary) <> 'object'
-    or metric_summary->>'week' is distinct from document_period
+    or coalesce(metric_summary->>'month', metric_summary->>'week') is distinct from document_period
     or jsonb_typeof(metric_summary->'sections') is distinct from 'array'
     or jsonb_array_length(metric_summary->'sections') <> 3
     or octet_length(metric_summary::text) > 100000 then
