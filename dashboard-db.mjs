@@ -22,7 +22,7 @@ export async function loadDatabaseMetrics(week,options={}){let rows;if(options.r
 
 export function monthlyDatabaseSummary(records,month,seminars){
  const prev=new Date(month+'-01T12:00:00Z');prev.setUTCMonth(prev.getUTCMonth()-1);const previous=prev.toISOString().slice(0,7);
- const summary=emptyMetrics(month+'-01');summary.month=month;summary.source='Dashboard_DV.datasets';summary.fetched_at=new Date().toISOString();
+ const summary=emptyMetrics(month+'-01');summary.month=month;summary.trends=[];summary.source='Dashboard_DV.datasets';summary.fetched_at=new Date().toISOString();
  const sections=summary.sections;sections.forEach(s=>{s.period=month;s.rows=[];s.note='선택 월과 직전 월의 원본 집계 값입니다.';});
  for(const [svc,platform] of [['dv','닥터빌'],['pv','팜빌']]){
   const record=records.find(r=>String(r.key).startsWith('report|'+svc+'|')&&r.data?.m);
@@ -31,6 +31,7 @@ export function monthlyDatabaseSummary(records,month,seminars){
    const metric=data?.m?.[key];if(!metric)continue;
    const value=m=>{const values=(metric.src?.m||[]).filter(x=>String(x[0]).slice(0,7)===m);return values.length?numberValue(values.at(-1)[1]):null};
    sections[index].rows.push({label:metric.label||key,platform,value:value(month),previous:value(previous),unit:metric.unit||''});
+   const year=Number(month.slice(0,4)),last=Number(month.slice(5,7));summary.trends.push({label:metric.label||key,platform,unit:metric.unit||'',months:Array.from({length:last},(_,i)=>String(i+1).padStart(2,'0')),current:Array.from({length:last},(_,i)=>value(year+'-'+String(i+1).padStart(2,'0'))),previous:Array.from({length:last},(_,i)=>value((year-1)+'-'+String(i+1).padStart(2,'0')))});
   }
   sections[0].platform_notes||={};sections[0].platform_notes[platform]=record?'통합 DB 보고서 저장본 · '+(record.fetched_at||''):'통합 DB 보고서 저장본을 찾지 못했습니다.';
  }
