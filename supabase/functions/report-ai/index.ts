@@ -23,7 +23,7 @@ metrics는 항상 빈 배열입니다. 지표 표는 시스템이 원본 수치�
 function metricHighlights(metrics,basis='전주'){
  const names=['회원 및 활동성','비학술 세미나','포인트'],num=v=>{if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(String(v).replace(/[,\s명점%P]/g,''));return Number.isFinite(n)?n:null;};
  const fmt=(n,unit)=>n.toLocaleString('ko-KR',{maximumFractionDigits:2})+(unit||'');
- return (metrics?.sections||[]).flatMap((section,i)=>(section?.rows||[]).map(r=>{const a=num(r.value),b=num(r.previous),unit=String(r.unit||''),d=a!==null&&b!==null?a-b:null,day=String(r.through||'').slice(8,10),label=r.basis==='same-days'&&day?basis+' 동기간(1~'+Number(day)+'일)':basis;
+ return (metrics?.sections||[]).flatMap((section,i)=>(section?.rows||[]).filter(r=>r.key!=='sales'&&r.group!=='매출'&&!/^매출/.test(String(r.label||''))).map(r=>{const a=num(r.value),b=num(r.previous),unit=String(r.unit||''),d=a!==null&&b!==null?a-b:null,day=String(r.through||'').slice(8,10),label=r.basis==='same-days'&&day?basis+' 동기간(1~'+Number(day)+'일)':basis;
   return {group:r.group||names[i]||String(section.title||''),platform:r.platform||(/^\[팜빌\]/.test(r.label||'')?'팜빌':'닥터빌'),name:String(r.label||'').replace(/^\[(닥터빌|팜빌)\]\s*/,''),current:a===null?'자료 미확인':fmt(a,unit),previous:b===null?'자료 미확인':fmt(b,unit),change:d===null?'비교 불가':d===0?label+'와 동일':label+' 대비 '+(d>0?'+':'')+fmt(d,unit)+(b===0?'':' ('+(d>0?'+':'')+(d/Math.abs(b)*100).toFixed(1)+'%)'),...(r.partial&&r.through?{note:r.through+'까지 집계(진행 중)'}:{})};})).filter(x=>x.current!=='자료 미확인').slice(0,60);
 }
 function sourceBoundSchema(reportIds,metricIds=[]){

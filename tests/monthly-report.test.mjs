@@ -38,3 +38,7 @@ test('Word export builds an A4 document with a shaded summary box from the same 
  assert.equal(doc.o.sections[0].properties.page.size.width,11906);assert.ok(made.some(x=>x.name==='TableCell'&&x.o.shading?.fill==='EDEDED'));
  const text=made.filter(x=>x.name==='TextRun').map(x=>x.o.text).join('|');for(const t of ['2026년 10월 업무 성과 보고의 건','■ 1. 보고 요약','3. 한 일','(1) 신청 120명','5. 자문 필요 사항','■ 참고자료'])assert.ok(text.includes(t),t);
 });
+test('sales rows are never shown, even in previously saved documents',()=>{
+ const html=monthlyReportBody({...base(),metrics:{sections:[{rows:[{key:'sales',group:'매출',platform:'닥터빌',label:'매출 (실적)',value:3e8,previous:2e8,unit:'원'},{label:'매출 (실적)',value:1,previous:1,unit:'원'},{key:'mau',group:'활동성',platform:'닥터빌',label:'MAU',value:10,previous:9,unit:'명'}]},{rows:[]},{rows:[]}]}});
+ assert.ok(!html.includes('매출'));assert.ok(!html.includes('억원'));assert.ok(html.includes('① 활동성'));
+});

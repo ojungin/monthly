@@ -13,11 +13,12 @@ test('세미나는 달력 월 기준으로 완료 강의를 합산한다',()=>{
   total:{label:'전체 회원 (가입 누적)',kind:'level',unit:'명',src:{end:'2026-10-20',m:[['2026-09',1000]],w:[['2026-10-12',1070]]}},
   mau:{label:'MAU',kind:'avg',how:'mau',unit:'명',src:{end:'2026-10-20',m:[['2026-09',500],['2026-10',520]]}},
   earn:{label:'포인트 적립',kind:'sum',unit:'P',src:{end:'2026-10-31',m:[['2026-09',100],['2026-10',150]]}},
+  sales:{label:'매출 (실적)',kind:'sum',unit:'원',src:{end:'2026-10-31',m:[['2026-10',3e8]]}},
   sem:{label:'세미나 진행',kind:'sum',unit:'건',src:{end:'2026-10-31',m:[['2026-10',3]]}}}}}];
  const s=monthlyDatabaseSummary(records,'2026-10',[]),row=k=>[...s.sections[0].rows,...s.sections[2].rows].find(r=>r.key===k);
  assert.deepEqual([row('newM').value,row('newM').previous,row('newM').basis,row('newM').through],[80,60,'same-days','2026-10-20']);
  assert.deepEqual([row('total').value,row('total').previous,row('total').group],[1070,1000,'회원']);
  assert.equal(row('mau').value,null);assert.equal(row('mau').previous,500);
  assert.deepEqual([row('earn').value,row('earn').previous,row('earn').partial],[150,100,false]);assert.ok(s.sections[2].rows.includes(row('earn')));
- assert.equal(row('sem'),undefined);assert.equal(s.packs[0].key,'report|dv|2026-10-21');assert.equal(s.sections.length,3);
+ assert.equal(row('sem'),undefined);assert.equal(row('sales'),undefined);assert.equal(s.packs[0].key,'report|dv|2026-10-21');assert.equal(s.sections.length,3);
 });

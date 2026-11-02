@@ -35,9 +35,11 @@ function metricNote(row){
  return row.note||'';
 }
 const legacyGroup=i=>['회원·활동성','세미나','포인트'][i]||'기타';
+// 매출은 월 성과 보고서에 표시하지 않습니다(이전에 저장된 문서 포함).
+const isSales=r=>r.key==='sales'||r.group==='매출'||/^매출/.test(String(r.label||''));
 export function metricTables(s){
- const sections=s.metrics?.sections||[],rows=sections.flatMap((sec,i)=>(sec.rows||[]).map(r=>({...r,group:r.group||legacyGroup(i)})));
- const order=['회원','활동성','회원·활동성','포인트','매출','세미나','기타'],cur=monthNo(s.month),prev=monthNo(previousMonthOf(s.month));
+ const sections=s.metrics?.sections||[],rows=sections.flatMap((sec,i)=>(sec.rows||[]).filter(r=>!isSales(r)).map(r=>({...r,group:r.group||legacyGroup(i)})));
+ const order=['회원','활동성','회원·활동성','포인트','세미나','기타'],cur=monthNo(s.month),prev=monthNo(previousMonthOf(s.month));
  const titles={'세미나':'비학술 세미나'};
  return order.filter(g=>rows.some(r=>r.group===g)).map((g,i)=>({title:(CIRC[i]||'-')+' '+(titles[g]||g),head:['플랫폼','지표',prev+'월',cur+'월','증감','증감률','비고'],numeric:[2,3,4,5],
   rows:['닥터빌','팜빌'].flatMap(p=>rows.filter(r=>r.group===g&&(r.platform||'닥터빌')===p)).map(r=>{const c=metricChange(r);return [r.platform||'닥터빌',String(r.label||'').replace(/^\[(닥터빌|팜빌)\]\s*/,''),formatMetric(r.previous,r.unit),formatMetric(r.value,r.unit),c.diff,c.rate,metricNote(r)];})}));

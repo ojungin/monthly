@@ -54,7 +54,9 @@ function levelOf(src,a,b){const b2=Math.min(b,src.en);let best=null;for(const g 
 export function evaluateMetric(mt,a,b){if(!mt?.src)return null;const r=mt.kind==='sum'?sumOf(mt.src,a,b):mt.kind==='avg'?avgOf(mt.src,a,b,mt.how):levelOf(mt.src,a,b);
  // 통계 사이트와 같이 기간의 절반 이상 미집계인 합계는 값으로 쓰지 않음
  if(mt.kind==='sum'&&r.val!==null&&r.miss>(b-a+1)/2)r.val=null;return r;}
-export const metricGroups=[['회원',['total','newM','gaMem']],['활동성',['mau','dau','wau','views','visits','newU']],['포인트',['earn','use','cancel','expire','bal']],['매출',['sales']]];
+export const metricGroups=[['회원',['total','newM','gaMem']],['활동성',['mau','dau','wau','views','visits','newU']],['포인트',['earn','use','cancel','expire','bal']]];
+// 월 성과 보고서에서 제외하는 지표: 세미나(원본 시트로 별도 집계), 매출(보고 대상 아님)
+export const excludedMonthlyMetrics=['sem','sales'];
 const groupOf=key=>metricGroups.find(([,keys])=>keys.includes(key))?.[0]||'기타';
 const orderOf=key=>{const flat=metricGroups.flatMap(([,k])=>k),i=flat.indexOf(key);return i<0?999:i;};
 // 선택 월과 직전 월 비교. 진행 중인 달의 합계 지표는 직전 월의 같은 기간(1~D일)과 비교합니다.
@@ -79,8 +81,7 @@ export function monthlyDatabaseSummary(records,month,seminars){
   const record=records.find(r=>String(r.key).startsWith('report|'+svc+'|')&&r.data?.m);
   summary.packs.push({platform,key:record?.key||'',generated_at:record?.data?.generatedAt||record?.fetched_at||'',anchor:record?.data?.anchor||''});
   if(!record)continue;
-  // 세미나는 Google Sheets 원본을 직접 집계하므로 통계 리포트의 '세미나 진행'은 제외합니다.
-  for(const key of Object.keys(record.data.m).filter(k=>k!=='sem').sort((a,b)=>orderOf(a)-orderOf(b))){
+  for(const key of Object.keys(record.data.m).filter(k=>!excludedMonthlyMetrics.includes(k)).sort((a,b)=>orderOf(a)-orderOf(b))){
    const row=monthlyMetricRow(key,record.data.m[key],platform,month);sections[row.group==='포인트'?2:0].rows.push(row);
   }
  }
