@@ -67,11 +67,35 @@ function workBody(rows,empty){
 }
 // 동일 담당자+업무 ID는 월 내 최신 보고 기준
 export function latestMonthlyTasks(s){const tasks=new Map();for(const r of [...(s.reports||[])].sort((a,b)=>b.week_start.localeCompare(a.week_start)||String(b.updated_at||'').localeCompare(String(a.updated_at||''))))(r.items||[]).forEach((i,n)=>{const key=r.user_id+':'+(i.id||r.id+'-'+n);if(!tasks.has(key))tasks.set(key,{...i,owner:r.user_id});});return [...tasks.values()];}
-function fallbackWork(s,kind){
- const tasks=latestMonthlyTasks(s),person=id=>s.members?.find(m=>m.id===id)?.name||'미등록';
- const cat=t=>workCategories.includes(t.project)?t.project:'기타';
- if(kind==='done')return tasks.filter(t=>t.state==='완료'||String(t.result||'').trim()).map(t=>({category:cat(t),topic:t.title+' ('+(t.service||'공통')+' · '+person(t.owner)+')',summary:t.state+' · 진행률 '+t.progress+'%',details:lines(t.result)}));
- return tasks.filter(t=>t.state!=='완료').map(t=>({category:cat(t),topic:t.title+' ('+(t.service||'공통')+' · '+person(t.owner)+')',summary:t.state+' · 진행률 '+t.progress+'% · 목표 일정 '+(t.target_date||'미지정'),details:[]}));
+// 선택 월 주간 보고의 주요 업무를 업무 단위로 모읍니다(담당자 + 업무 ID, ID가 없으면 업무명).
+// GPT 함수(supabase/functions/_shared/summary.mjs의 taskDigest)와 같은 순서·키(T01…)를 만듭니다.
+export function monthlyTaskDigest(s){
+ const name=id=>(s.members||[]).find(m=>m.id===id)?.name||'미등록';
+ const reports=[...(s.reports||[])].sort((a,b)=>String(a.report_date||a.week_start).localeCompare(String(b.report_date||b.week_start))||String(a.updated_at||'').localeCompare(String(b.updated_at||''))||String(a.id).localeCompare(String(b.id)));
+ const map=new Map();
+ for(const r of reports)(r.items||[]).forEach(i=>{const id=String(r.user_id)+':'+(i.id?String(i.id):'title:'+String(i.title||'').replace(/\s+/g,' ').trim());
+  if(!map.has(id))map.set(id,{task_key:'T'+String(map.size+1).padStart(2,'0'),user_id:r.user_id,owner:name(r.user_id),history:[],report_ids:[]});
+  const t=map.get(id);Object.assign(t,{category:String(i.project||''),service:String(i.service||''),title:String(i.title||''),state:String(i.state||''),progress:i.progress??null,target_date:String(i.target_date||'')});
+  t.history.push({report_id:r.id,date:String(r.report_date||r.week_start),state:String(i.state||''),progress:i.progress??null,result:String(i.result||'')});if(!t.report_ids.includes(r.id))t.report_ids.push(r.id);});
+ return [...map.values()];
+}
+// 3. 한 일 / 4. 할 일: 모든 주요 업무를 업무 분야별로 나열하고 업무마다 요약 항목을 붙입니다.
+function taskBody(s,kind){
+ const ai=s.ai_summary,digest=monthlyTaskDigest(s),byKey=new Map((Array.isArray(ai?.tasks)?ai.tasks:[]).map(t=>[t.task_key,t]));
+ const cat=t=>workCategories.includes(t.category)?t.category:'기타',L=[];let raw=0;
+ const head=t=>t.title+' ('+[t.service||'공통',t.owner,t.state+(t.progress!==null&&t.progress!==''?' '+t.progress+'%':'')].join(' · ')+')';
+ const rawItems=t=>kind==='done'?[...new Set(t.history.flatMap(h=>lines(h.result)))]:t.state==='완료'?[]:[(t.state||'진행')+' 중 · 진행률 '+(t.progress??'-')+'%'+(t.target_date?' · 목표 일정 '+t.target_date:'')];
+ const empty=t=>kind==='done'?'기재된 수행 내용 없음':t.state==='완료'?'완료 · 후속 할 일 없음':'다음 달 진행 계획 미기재';
+ for(const c of workCategories){const group=digest.filter(t=>cat(t)===c);if(!group.length)continue;
+  if(L.length)L.push({t:'gap'});L.push({t:'cat',text:'['+c+']'});
+  group.forEach((t,i)=>{L.push({t:'goal',text:(i+1)+'. '+head(t)});const g=byKey.get(t.task_key);let items=g&&Array.isArray(g[kind])?g[kind].map(x=>String(x).trim()).filter(Boolean):null;if(!items){items=rawItems(t);raw++;}if(!items.length)items=[empty(t)];items.forEach((x,j)=>L.push({t:'item',text:'('+(j+1)+') '+x}));});
+ }
+ const other=byKey.get('OTHER'),otherItems=(other?.[kind]||[]).map(x=>String(x).trim()).filter(Boolean);
+ const plans=kind==='todo'&&!Array.isArray(ai?.tasks)?[...new Map([...(s.reports||[])].sort((a,b)=>String(a.report_date||a.week_start).localeCompare(String(b.report_date||b.week_start))).filter(r=>String(r.next_plan||'').trim()).map(r=>[r.user_id,r])).values()].flatMap(r=>lines(r.next_plan).map(x=>(s.members?.find(m=>m.id===r.user_id)?.name||'미등록')+' · '+x)):[];
+ if(otherItems.length||plans.length){if(L.length)L.push({t:'gap'});L.push({t:'cat',text:'[기타]'});L.push({t:'goal',text:'1. '+(plans.length?'최근 주간 보고의 차주 계획':kind==='done'?'업무에 연결되지 않은 이슈 대응':'업무에 연결되지 않은 후속 조치')});[...otherItems,...plans].forEach((x,j)=>L.push({t:'item',text:'('+(j+1)+') '+x}));}
+ if(!L.length)return [{t:'p',text:'선택 월 주간 보고에 등록된 주요 업무 없음'}];
+ if(raw)L.push({t:'note',text:!ai?'※ 요약 미생성 상태로 주간 보고 원문을 업무별로 정리함':'※ 요약이 없는 업무는 주간 보고 원문을 그대로 표시함'});
+ return L;
 }
 function summaryLines(s){
  const ai=s.ai_summary,reports=s.reports||[],tasks=latestMonthlyTasks(s);
@@ -84,13 +108,14 @@ function summaryLines(s){
 }
 export function monthlyReportModel(s){
  const month=s.month,ai=s.ai_summary,legacyAI=ai&&!Array.isArray(ai.overview);
- const done=ai?.done?.length?ai.done:ai?[]:fallbackWork(s,'done'),todo=ai?.todo?.length?ai.todo:ai?[]:fallbackWork(s,'todo');
+ // 이전 양식(업무 분야별 done/todo 행)으로 요약된 문서는 그 결과를 그대로 보여 줍니다.
+ const legacyRows=ai&&!Array.isArray(ai.tasks)&&(ai.done?.length||ai.todo?.length);
  const advisory=lines(s.advisory_request);
  const members=s.members||[],person=id=>members.find(m=>m.id===id)?.name||'미등록';
  const sections=[
   {title:'2. 주요 지표',body:metricBody(s),tables:metricTables(s)},
-  {title:'3. 한 일',body:[...workBody(done,'선택 월에 정리된 수행 내용 없음'),...(ai?[]:[{t:'note',text:'※ 요약 미생성 상태로 주간 보고의 최신 업무 상태를 그대로 정리함'}])]},
-  {title:'4. 할 일',body:[...workBody(todo,'다음 달로 이어지는 업무 없음'),...(ai?[]:[{t:'note',text:'※ 요약 미생성 상태로 완료되지 않은 업무를 그대로 정리함'}])]},
+  {title:'3. 한 일',body:legacyRows?workBody(ai.done||[],'선택 월에 정리된 수행 내용 없음'):taskBody(s,'done')},
+  {title:'4. 할 일',body:legacyRows?workBody(ai.todo||[],'다음 달로 이어지는 업무 없음'):taskBody(s,'todo')},
   {title:'5. 자문 필요 사항',body:advisory.length?advisory.map((x,i)=>({t:'num',text:(CIRC[i]||'-')+' '+x})):[{t:'p',text:'해당 없음'}]}
  ];
  const tasks=latestMonthlyTasks(s),appendix=[];
