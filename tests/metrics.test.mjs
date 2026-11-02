@@ -28,7 +28,9 @@ test('weekly body includes numbered sections and escapes manually entered text',
  const s={week:'2026-10-05',created_at:'2026-10-07T00:00:00Z',author:'test',members:[],reports:[],metrics:emptyMetrics('2026-10-05')};
  s.metrics.sections[0].rows=[{label:'<script>',value:0,unit:'명'}];
  const html=weeklyBody(s);assert(!html.includes('<script>'));assert(html.includes('&lt;script&gt;'));let last=-1;
- for(const title of ['0. 기간','1. 주요 지표','2. 비학술 세미나','3. 포인트','4. 주간 업무','5. 금주 이슈 및 대응','6. 다음주']){const pos=html.indexOf(title);assert(pos>last);last=pos;}
+ for(const title of ['1. 보고서 요약','2. 주요 지표','2-1. 회원 및 활동성','2-2. 비학술 세미나','2-3. 포인트','3. 주요 업무','4. 금주 이슈 및 대응','5. 차주 계획']){const pos=html.indexOf(title);assert(pos>last,title);last=pos;}
+ for(const old of ['0. 기간','4. 주간 업무','6. 다음주'])assert(!html.includes(old),old);
+ assert.equal(html.split('<h2>').length-1,5);
 });
 
 test('direct seminar response decodes Google dates, formatted counts and zero scores',async()=>{

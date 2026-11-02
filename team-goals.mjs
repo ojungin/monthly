@@ -1,4 +1,4 @@
-import {escapeHTML as e} from './core.mjs';
+import {escapeHTML as e} from './core.mjs?v=20261102-report5';
 export const goalCategories=['닥터빌','팜빌','공통'];
 export const goalPeriods={half:['상반기','하반기'],quarter:['1분기','2분기','3분기','4분기']};
 export function validateGoal(row){if(!Number.isInteger(row.year)||row.year<2000||row.year>2100)throw Error('연도는 2000~2100 사이로 입력해주세요.');if(!goalCategories.includes(row.category))throw Error('분류를 선택해주세요.');if(!row.business_goal.trim()||!row.team_goal.trim())throw Error('사업부 목표와 팀 단위 실행 목표를 입력해주세요.');}

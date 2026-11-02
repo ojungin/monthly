@@ -19,3 +19,13 @@ test('screen and HTML retain metric notes/sources; print options remove metadata
 test('Word and PDF request the print-only view while HTML keeps the default view',async()=>{
  const source=await readFile(new URL('../portal.mjs',import.meta.url),'utf8');assert.ok(source.includes("documentHTML(s,kind,{includeMetricMetadata:false})"));assert.ok(source.includes('host.innerHTML=documentBody(s,kind,{includeMetricMetadata:false})'));assert.ok(source.includes("new Blob([documentHTML(s,kind)]"));
 });
+test('Excel layout uses the five weekly sections with metric subsections',()=>{
+ const layout=weeklyExcelLayout(fixture()),titles=layout.rows.filter(r=>r.kind==='section').map(r=>r.cells[0].value),subs=layout.rows.filter(r=>r.kind==='subsection').map(r=>r.cells[0].value);
+ assert.deepEqual(titles,['1. 보고서 요약','2. 주요 지표','3. 주요 업무','4. 금주 이슈 및 대응','5. 차주 계획']);assert.deepEqual(subs,['2-1. 회원 및 활동성','2-2. 비학술 세미나 기획 및 운영','2-3. 포인트 지급·사용·잔여']);
+ assert.ok(JSON.stringify(layout).includes('차주 계획'));assert.ok(!JSON.stringify(layout).includes('다음 주 계획'));
+});
+test('all local module imports share one cache-busting version',async()=>{
+ const {readdir}=await import('node:fs/promises');const files=['app.js',...(await readdir(new URL('..',import.meta.url))).filter(f=>f.endsWith('.mjs'))];const tags=new Set();
+ for(const f of files){const src=await readFile(new URL('../'+f,import.meta.url),'utf8');for(const m of src.matchAll(/'\.\/[a-z0-9-]+\.mjs(\?v=[^']*)?'/g))tags.add(m[1]||'none');}
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');tags.add(html.match(/app\.js(\?v=[^"]*)/)[1]);assert.equal(tags.size,1,[...tags].join(', '));
+});
