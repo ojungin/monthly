@@ -17,7 +17,7 @@ begin
  ) r;
  else
  select jsonb_agg(to_jsonb(r) order by r.week_start,r.user_id) into rs from public.reports r
- where r.status='submitted' and to_char(r.week_start,'YYYY-MM')=document_period;
+ where r.status='submitted' and to_char(coalesce(r.report_date,r.week_start),'YYYY-MM')=document_period;
  end if;
  if rs is null then raise exception '제출된 보고가 없습니다';end if;
  select jsonb_agg(jsonb_build_object('id',m.id,'name',m.name,'team',m.team) order by m.name) into ms from public.members m;
