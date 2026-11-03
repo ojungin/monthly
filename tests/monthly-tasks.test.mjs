@@ -31,12 +31,12 @@ test('a GPT group cannot mix platforms or reuse a task; leftovers fall back to s
  const s=snap();s.ai_summary=G({groups:[{platform:'닥터빌',title:'혼합',task_keys:['T01','T02'],done:['세미나 운영'],todo:[]},{platform:'팜빌',title:'중복',task_keys:['T01'],done:['x'],todo:[]}]});
  const txt=body(monthlyReportModel(s),1).map(x=>x[1]);
  assert.ok(txt.includes('1. 혼합 (가상A · 진행 80%)'));assert.ok(!txt.some(x=>x.startsWith('1. 중복')));
- assert.ok(txt.includes('1. 배너 교체 (업무 2건 · 가상A·가상B)'));for(const t of ['(1) 시안','(2) 최종 반영','(3) 배포'])assert.ok(txt.includes(t),t);
+ assert.ok(txt.includes('1. 배너 교체 (업무 2건 · 가상A·가상B)'));assert.ok(txt.includes('(1) 최종 반영 · 시안 · 배포'));
 });
 test('documents without summary (or with the older per-task summary) still list every task by platform',()=>{
  const s=snap();s.ai_summary={overview:[],issues:[],plans:[],done:[],todo:[],metrics:[]};
  const r=monthlyReportModel(s),done=body(r,1).map(x=>x[1]),todo=body(r,2).map(x=>x[1]);
- for(const t of ['가. 닥터빌','(1) 1차 진행','(2) 신청 100명','(3) 2차 완료','나. 팜빌','(1) 시안','(2) 최종 반영'])assert.ok(done.includes(t),t);
+ for(const t of ['가. 닥터빌','(1) 2차 완료 · 1차 진행 · 신청 100명','나. 팜빌','(1) 최종 반영 · 시안 · 배포'])assert.ok(done.includes(t),t);
  assert.ok(todo.includes('(1) 진행 중 · 진행률 80%'));assert.ok(todo.includes('2. 최근 주간 보고의 차주 계획'));assert.ok(todo.includes('(1) 가상A · 11월 일정 확정'));
  const o=snap();o.ai_summary={overview:[],issues:[],plans:[],done:[],todo:[],metrics:[],tasks:[{task_key:'T01',done:['예전 요약'],todo:[]},{task_key:'OTHER',done:['예전 기타'],todo:[]}]};
  const od=body(monthlyReportModel(o),1).map(x=>x[1]);assert.ok(od.includes('(1) 예전 요약'));assert.ok(od.includes('(1) 예전 기타'));
@@ -69,4 +69,16 @@ test('monthly function sends the task list with platforms (without account ids) 
  const r=await handler(new Request('https://e/report-ai',{method:'POST',headers:{authorization:'Bearer t','Content-Type':'application/json'},body:JSON.stringify({document_id:id})}));
  assert.equal(r.status,200);assert.deepEqual(input.tasks.map(t=>t.task_key),['T01','T02','T03','T04']);assert.equal(input.tasks[0].user_id,undefined);assert.equal(input.tasks[0].history.length,2);
  assert.deepEqual(input.tasks.map(t=>t.platform),['닥터빌','팜빌','팜빌','공통']);assert.deepEqual(schema.properties.groups.items.properties.task_keys.items.enum,['T01','T02','T03','T04']);assert.deepEqual(saved.groups[0].task_keys,['T01']);
+});
+test('grouped summaries are never mistaken for the old 업무 분야 rows even if top-level done/todo are filled',()=>{
+ const s=snap();s.ai_summary=G({done:[{category:'기타',topic:'x',summary:'y',details:[],report_ids:['r1']}]});
+ const txt=monthlyReportModel(s).sections[1].body.map(l=>l.text||'');assert.ok(txt.includes('가. 닥터빌'));assert.ok(!txt.includes('1. x'));
+});
+test('raw detail lists are compressed to at most two lines; long GPT lists are packed into two lines',async()=>{
+ const {twoLines,packTwo}=await import('../monthly-report.mjs');
+ const many=Array.from({length:12},(_,i)=>'(1) 항목 '+(i+1)+' 세부 내용 정리 완료');many.push('https://www.figma.com/x','기획안:');
+ const out=twoLines(many);assert.equal(out.length,2);assert.ok(out.every(l=>l.length<=120));assert.match(out[1],/외 \d+건$/);assert.ok(!out.join('').includes('http'));assert.ok(!out.join('').includes('기획안:'));
+ assert.deepEqual(packTwo(['a','b','c']),['a b','c']);assert.deepEqual(packTwo(['a']),['a']);
+ const s=snap();s.reports[0].items[0].result=many.join('\n');const lines=monthlyReportModel(s).sections[1].body.filter(l=>l.t==='item');
+ assert.ok(lines.length<=6);assert.ok(lines.every(l=>/^\((1|2)\) /.test(l.text)));
 });

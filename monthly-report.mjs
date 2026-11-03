@@ -1,6 +1,6 @@
 // 월 성과 보고서 — tf-worklog '보고의 건' 양식(보고요약 회색 박스, 회색 머리글 표, A4 Word)을 따릅니다.
 // 보고서는 하나의 모델(monthlyReportModel)에서 화면·HTML·PDF·Word를 모두 만듭니다.
-import {escapeHTML as e} from './core.mjs?v=20261103-platform';
+import {escapeHTML as e} from './core.mjs?v=20261103-twoline';
 
 export const workCategories=['콘텐츠 운영','플랫폼 운영','콘텐츠 신규','플랫폼 신규','AX/업무 효율화','AX/신규','기타'];
 export const reportPlatforms=['닥터빌','팜빌','배터빌','공통'];
@@ -105,12 +105,23 @@ export function monthlyTaskGroups(s){
  for(const g of groups)if(!g.ai)g.legacy=g.tasks.map(t=>legacy.get(t.task_key)||null);
  return groups;
 }
+// 세부 내용은 항목당 최대 두 줄로 보여 줍니다.
+const cleanLine=x=>String(x||'').replace(/https?:\/\/\S+/g,'').replace(/^\s*(?:\(\d{1,2}\)|\d{1,2}[.)](?!\d)|[-•·*▪◦]|[①-⑳])\s*/u,'').replace(/\s+/g,' ').trim();
+// 원문 세부 항목: 짧은 항목을 ' · '로 이어 두 줄로 압축하고, 넘치는 항목은 '외 N건'으로 표시
+export function twoLines(list,max=110){
+ const items=[...new Set((list||[]).map(cleanLine).filter(x=>x.length>1&&!/[:：]$/.test(x)))],out=[];let i=0;
+ while(out.length<2&&i<items.length){let line=items[i++];if(line.length>max)line=line.slice(0,max-1)+'…';while(i<items.length&&line.length+3+items[i].length<=max)line+=' · '+items[i++];out.push(line);}
+ if(i<items.length&&out.length)out[out.length-1]+=' 외 '+(items.length-i)+'건';
+ return out;
+}
+// 요약 문장이 세 개 이상이면 두 줄로 나눠 붙입니다(내용은 자르지 않음).
+export function packTwo(list){const a=(list||[]).map(x=>String(x).replace(/https?:\/\/\S+/g,'').trim()).filter(Boolean);if(a.length<=2)return a;const h=Math.ceil(a.length/2);return [a.slice(0,h).join(' '),a.slice(h).join(' ')];}
 function taskBody(s,kind){
  const ai=s.ai_summary,groups=monthlyTaskGroups(s),L=[];let raw=0,skipped=0;
  const st=t=>(t.state||'진행')+(t.progress!==null&&t.progress!==''?' '+t.progress+'%':'');
  const head=g=>g.other?'업무에 연결되지 않은 '+(kind==='done'?'이슈 대응':'후속 조치'):g.tasks.length===1?g.title+' ('+g.tasks[0].owner+' · '+st(g.tasks[0])+')':g.title+' (업무 '+g.tasks.length+'건 · '+[...new Set(g.tasks.map(t=>t.owner))].join('·')+')';
- const rawItems=(t,multi)=>{const pre=multi?t.owner+' · ':'';return kind==='done'?[...new Set(t.history.flatMap(h=>lines(h.result)))]:t.state==='완료'?[]:[pre+(t.state||'진행')+' 중 · 진행률 '+(t.progress??'-')+'%'+(t.target_date?' · 목표 일정 '+t.target_date:'')];};
- const itemsOf=g=>{if(g.ai)return g[kind];const multi=g.tasks.length>1;return [...new Set(g.tasks.flatMap((t,i)=>{const l=g.legacy?.[i];if(l&&Array.isArray(l[kind]))return l[kind].map(x=>String(x).trim()).filter(Boolean);raw++;return rawItems(t,multi);}))];};
+ const rawItems=(t,multi)=>kind==='done'?t.history.slice().reverse().flatMap(h=>lines(h.result)):t.state==='완료'?[]:[(multi?t.title+' '+(t.state||'진행')+' ':(t.state||'진행')+' 중 · 진행률 ')+(t.progress??'-')+'%'+(t.target_date?' · 목표 일정 '+t.target_date:'')];
+ const itemsOf=g=>{if(g.ai)return packTwo(g[kind]);const multi=g.tasks.length>1,legacyLines=[],rawLines=[];g.tasks.forEach((t,i)=>{const l=g.legacy?.[i];if(l&&Array.isArray(l[kind]))legacyLines.push(...l[kind].map(x=>String(x).trim()).filter(Boolean));else{raw++;rawLines.push(...rawItems(t,multi));}});return [...packTwo(legacyLines),...twoLines(rawLines)].slice(0,2);};
  const allDone=g=>g.tasks.length&&g.tasks.every(t=>t.state==='완료');
  const empty=g=>kind==='done'?'기재된 수행 내용 없음':'다음 달 진행 계획 미기재';
  const plans=kind==='todo'&&!Array.isArray(ai?.tasks)&&!Array.isArray(ai?.groups)?[...new Map([...(s.reports||[])].sort((a,b)=>String(a.report_date||a.week_start).localeCompare(String(b.report_date||b.week_start))).filter(r=>String(r.next_plan||'').trim()).map(r=>[r.user_id,r])).values()].flatMap(r=>lines(r.next_plan).map(x=>(s.members?.find(m=>m.id===r.user_id)?.name||'미등록')+' · '+x)):[];
@@ -128,7 +139,7 @@ function taskBody(s,kind){
   if(block.length){if(L.length)L.push({t:'gap'});L.push({t:'plat',text:PLAT_NO[pi++]+'. '+p},...block);}}
  if(!L.length)return [{t:'p',text:kind==='todo'&&skipped?'선택 월 주요 업무가 모두 완료되어 다음 달로 이어지는 할 일 없음':'선택 월 주간 보고에 등록된 주요 업무 없음'}];
  if(skipped)L.push({t:'note',text:'※ 완료되어 후속 할 일이 없는 업무 '+skipped+'건은 제외함'});
- if(raw)L.push({t:'note',text:!ai?'※ 요약 미생성 상태로 주간 보고 원문을 업무별로 정리함':'※ 요약이 없는 업무는 주간 보고 원문을 그대로 표시함'});
+ if(raw)L.push({t:'note',text:!ai?'※ 요약 미생성 상태로 주간 보고 원문을 업무별 두 줄로 압축해 정리함':'※ 요약이 없는 업무는 주간 보고 원문을 두 줄로 압축해 표시함'});
  return L;
 }
 function summaryLines(s){
@@ -143,7 +154,7 @@ function summaryLines(s){
 export function monthlyReportModel(s){
  const month=s.month,ai=s.ai_summary,legacyAI=ai&&!Array.isArray(ai.overview);
  // 이전 양식(업무 분야별 done/todo 행)으로 요약된 문서는 그 결과를 그대로 보여 줍니다.
- const legacyRows=ai&&!Array.isArray(ai.tasks)&&(ai.done?.length||ai.todo?.length);
+ const legacyRows=ai&&!Array.isArray(ai.tasks)&&!Array.isArray(ai.groups)&&(ai.done?.length||ai.todo?.length);
  const advisory=lines(s.advisory_request);
  const members=s.members||[],person=id=>members.find(m=>m.id===id)?.name||'미등록';
  const sections=[
