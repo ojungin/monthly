@@ -1,8 +1,11 @@
 // 월 성과 보고서 — tf-worklog '보고의 건' 양식(보고요약 회색 박스, 회색 머리글 표, A4 Word)을 따릅니다.
 // 보고서는 하나의 모델(monthlyReportModel)에서 화면·HTML·PDF·Word를 모두 만듭니다.
-import {escapeHTML as e} from './core.mjs?v=20261102-report5';
+import {escapeHTML as e} from './core.mjs?v=20261103-platform';
 
 export const workCategories=['콘텐츠 운영','플랫폼 운영','콘텐츠 신규','플랫폼 신규','AX/업무 효율화','AX/신규','기타'];
+export const reportPlatforms=['닥터빌','팜빌','배터빌','공통'];
+export const platformOf=v=>reportPlatforms.includes(String(v||'').trim())?String(v).trim():'공통';
+const PLAT_NO='가나다라마바사아자차';
 export const monthlyOverviewAreas=['주요 지표','한 일','할 일'];
 const CIRC='①②③④⑤⑥⑦⑧⑨⑩';
 const pad=n=>String(n).padStart(2,'0');
@@ -75,25 +78,56 @@ export function monthlyTaskDigest(s){
  const map=new Map();
  for(const r of reports)(r.items||[]).forEach(i=>{const id=String(r.user_id)+':'+(i.id?String(i.id):'title:'+String(i.title||'').replace(/\s+/g,' ').trim());
   if(!map.has(id))map.set(id,{task_key:'T'+String(map.size+1).padStart(2,'0'),user_id:r.user_id,owner:name(r.user_id),history:[],report_ids:[]});
-  const t=map.get(id);Object.assign(t,{category:String(i.project||''),service:String(i.service||''),title:String(i.title||''),state:String(i.state||''),progress:i.progress??null,target_date:String(i.target_date||'')});
+  const t=map.get(id);Object.assign(t,{category:String(i.project||''),service:String(i.service||''),platform:reportPlatforms.includes(String(i.service||'').trim())?String(i.service).trim():'공통',work_area:workCategories.includes(String(i.project||''))?String(i.project):'기타',title:String(i.title||''),state:String(i.state||''),progress:i.progress??null,target_date:String(i.target_date||'')});
   t.history.push({report_id:r.id,date:String(r.report_date||r.week_start),state:String(i.state||''),progress:i.progress??null,result:String(i.result||'')});if(!t.report_ids.includes(r.id))t.report_ids.push(r.id);});
  return [...map.values()];
 }
-// 3. 한 일 / 4. 할 일: 모든 주요 업무를 업무 분야별로 나열하고 업무마다 요약 항목을 붙입니다.
-function taskBody(s,kind){
- const ai=s.ai_summary,digest=monthlyTaskDigest(s),byKey=new Map((Array.isArray(ai?.tasks)?ai.tasks:[]).map(t=>[t.task_key,t]));
- const cat=t=>workCategories.includes(t.category)?t.category:'기타',L=[];let raw=0;
- const head=t=>t.title+' ('+[t.service||'공통',t.owner,t.state+(t.progress!==null&&t.progress!==''?' '+t.progress+'%':'')].join(' · ')+')';
- const rawItems=t=>kind==='done'?[...new Set(t.history.flatMap(h=>lines(h.result)))]:t.state==='완료'?[]:[(t.state||'진행')+' 중 · 진행률 '+(t.progress??'-')+'%'+(t.target_date?' · 목표 일정 '+t.target_date:'')];
- const empty=t=>kind==='done'?'기재된 수행 내용 없음':t.state==='완료'?'완료 · 후속 할 일 없음':'다음 달 진행 계획 미기재';
- for(const c of workCategories){const group=digest.filter(t=>cat(t)===c);if(!group.length)continue;
-  if(L.length)L.push({t:'gap'});L.push({t:'cat',text:'['+c+']'});
-  group.forEach((t,i)=>{L.push({t:'goal',text:(i+1)+'. '+head(t)});const g=byKey.get(t.task_key);let items=g&&Array.isArray(g[kind])?g[kind].map(x=>String(x).trim()).filter(Boolean):null;if(!items){items=rawItems(t);raw++;}if(!items.length)items=[empty(t)];items.forEach((x,j)=>L.push({t:'item',text:'('+(j+1)+') '+x}));});
+// 3. 한 일 / 4. 할 일: 플랫폼(가. 닥터빌 …) → [업무 분야] → 유사 업무 그룹(1. …) → 진행 사항·해야 할 일
+// 그룹은 GPT가 같은 플랫폼·업무 분야 안에서 묶은 결과(ai.groups)를 쓰고, 빠진 업무는 같은 업무명끼리 묶어 원문으로 채웁니다.
+const areaOf=t=>workCategories.includes(t.category)?t.category:'기타';
+const bucketOf=t=>t.platform+'|'+areaOf(t);
+const normTitle=v=>String(v||'').replace(/\s+/g,'').toLowerCase();
+export function monthlyTaskGroups(s){
+ const ai=s.ai_summary,digest=monthlyTaskDigest(s),byKey=new Map(digest.map(t=>[t.task_key,t])),used=new Set(),groups=[];
+ const clean=(g,k)=>(Array.isArray(g?.[k])?g[k]:[]).map(x=>String(x).trim()).filter(Boolean);
+ for(const g of Array.isArray(ai?.groups)?ai.groups:[]){
+  const given=Array.isArray(g?.task_keys)?g.task_keys:[];
+  if(!given.length){if(clean(g,'done').length||clean(g,'todo').length)groups.push({platform:platformOf(g.platform),area:'기타',title:String(g.title||'').trim()||'기타',tasks:[],done:clean(g,'done'),todo:clean(g,'todo'),ai:true,other:true});continue;}
+  const keys=given.filter(k=>byKey.has(k)&&!used.has(k));if(!keys.length)continue;
+  const first=byKey.get(keys[0]),mine=keys.filter(k=>bucketOf(byKey.get(k))===bucketOf(first));mine.forEach(k=>used.add(k));
+  groups.push({platform:first.platform,area:areaOf(first),title:String(g.title||'').trim()||first.title,tasks:mine.map(k=>byKey.get(k)),done:clean(g,'done'),todo:clean(g,'todo'),ai:true});
  }
- const other=byKey.get('OTHER'),otherItems=(other?.[kind]||[]).map(x=>String(x).trim()).filter(Boolean);
- const plans=kind==='todo'&&!Array.isArray(ai?.tasks)?[...new Map([...(s.reports||[])].sort((a,b)=>String(a.report_date||a.week_start).localeCompare(String(b.report_date||b.week_start))).filter(r=>String(r.next_plan||'').trim()).map(r=>[r.user_id,r])).values()].flatMap(r=>lines(r.next_plan).map(x=>(s.members?.find(m=>m.id===r.user_id)?.name||'미등록')+' · '+x)):[];
- if(otherItems.length||plans.length){if(L.length)L.push({t:'gap'});L.push({t:'cat',text:'[기타]'});L.push({t:'goal',text:'1. '+(plans.length?'최근 주간 보고의 차주 계획':kind==='done'?'업무에 연결되지 않은 이슈 대응':'업무에 연결되지 않은 후속 조치')});[...otherItems,...plans].forEach((x,j)=>L.push({t:'item',text:'('+(j+1)+') '+x}));}
- if(!L.length)return [{t:'p',text:'선택 월 주간 보고에 등록된 주요 업무 없음'}];
+ // 이전 양식(업무별 ai.tasks) 요약 또는 GPT가 빠뜨린 업무: 같은 플랫폼·분야·업무명끼리 묶음
+ const legacy=new Map((Array.isArray(ai?.tasks)?ai.tasks:[]).map(t=>[t.task_key,t])),fb=new Map();
+ for(const t of digest){if(used.has(t.task_key))continue;const k=bucketOf(t)+'|'+normTitle(t.title);
+  if(!fb.has(k)){const g={platform:t.platform,area:areaOf(t),title:t.title,tasks:[],ai:false};fb.set(k,g);groups.push(g);}fb.get(k).tasks.push(t);}
+ const lo=legacy.get('OTHER');if(lo&&(clean(lo,'done').length||clean(lo,'todo').length))groups.push({platform:'공통',area:'기타',title:'기타',tasks:[],done:clean(lo,'done'),todo:clean(lo,'todo'),ai:true,other:true});
+ for(const g of groups)if(!g.ai)g.legacy=g.tasks.map(t=>legacy.get(t.task_key)||null);
+ return groups;
+}
+function taskBody(s,kind){
+ const ai=s.ai_summary,groups=monthlyTaskGroups(s),L=[];let raw=0,skipped=0;
+ const st=t=>(t.state||'진행')+(t.progress!==null&&t.progress!==''?' '+t.progress+'%':'');
+ const head=g=>g.other?'업무에 연결되지 않은 '+(kind==='done'?'이슈 대응':'후속 조치'):g.tasks.length===1?g.title+' ('+g.tasks[0].owner+' · '+st(g.tasks[0])+')':g.title+' (업무 '+g.tasks.length+'건 · '+[...new Set(g.tasks.map(t=>t.owner))].join('·')+')';
+ const rawItems=(t,multi)=>{const pre=multi?t.owner+' · ':'';return kind==='done'?[...new Set(t.history.flatMap(h=>lines(h.result)))]:t.state==='완료'?[]:[pre+(t.state||'진행')+' 중 · 진행률 '+(t.progress??'-')+'%'+(t.target_date?' · 목표 일정 '+t.target_date:'')];};
+ const itemsOf=g=>{if(g.ai)return g[kind];const multi=g.tasks.length>1;return [...new Set(g.tasks.flatMap((t,i)=>{const l=g.legacy?.[i];if(l&&Array.isArray(l[kind]))return l[kind].map(x=>String(x).trim()).filter(Boolean);raw++;return rawItems(t,multi);}))];};
+ const allDone=g=>g.tasks.length&&g.tasks.every(t=>t.state==='완료');
+ const empty=g=>kind==='done'?'기재된 수행 내용 없음':'다음 달 진행 계획 미기재';
+ const plans=kind==='todo'&&!Array.isArray(ai?.tasks)&&!Array.isArray(ai?.groups)?[...new Map([...(s.reports||[])].sort((a,b)=>String(a.report_date||a.week_start).localeCompare(String(b.report_date||b.week_start))).filter(r=>String(r.next_plan||'').trim()).map(r=>[r.user_id,r])).values()].flatMap(r=>lines(r.next_plan).map(x=>(s.members?.find(m=>m.id===r.user_id)?.name||'미등록')+' · '+x)):[];
+ if(plans.length)groups.push({platform:'공통',area:'기타',title:'최근 주간 보고의 차주 계획',tasks:[],done:[],todo:plans,ai:true,other:true,plans:true});
+ let pi=0;
+ for(const p of reportPlatforms){const pg=groups.filter(g=>g.platform===p);if(!pg.length)continue;const block=[];
+  for(const c of workCategories){const cg=pg.filter(g=>g.area===c).sort((a,b)=>(a.other?1:0)-(b.other?1:0));const out=[];
+   for(const g of cg){let items=itemsOf(g);
+    if(kind==='todo'&&!items.length&&(allDone(g)||g.other)){if(!g.other)skipped+=g.tasks.length;continue;}
+    if(!items.length)items=[empty(g)];
+    out.push({t:'goal',text:(out.filter(l=>l.t==='goal').length+1)+'. '+(g.plans?g.title:head(g))});
+    if(g.tasks.length>1)out.push({t:'bul',text:'· 대상 업무 : '+g.tasks.map(t=>t.title+'('+t.owner+' '+st(t)+')').join(', ')});
+    items.forEach((x,j)=>out.push({t:'item',text:'('+(j+1)+') '+x}));}
+   if(out.length){if(block.length)block.push({t:'gap'});block.push({t:'cat',text:'['+c+']'},...out);}}
+  if(block.length){if(L.length)L.push({t:'gap'});L.push({t:'plat',text:PLAT_NO[pi++]+'. '+p},...block);}}
+ if(!L.length)return [{t:'p',text:kind==='todo'&&skipped?'선택 월 주요 업무가 모두 완료되어 다음 달로 이어지는 할 일 없음':'선택 월 주간 보고에 등록된 주요 업무 없음'}];
+ if(skipped)L.push({t:'note',text:'※ 완료되어 후속 할 일이 없는 업무 '+skipped+'건은 제외함'});
  if(raw)L.push({t:'note',text:!ai?'※ 요약 미생성 상태로 주간 보고 원문을 업무별로 정리함':'※ 요약이 없는 업무는 주간 보고 원문을 그대로 표시함'});
  return L;
 }
@@ -119,7 +153,7 @@ export function monthlyReportModel(s){
   {title:'5. 자문 필요 사항',body:advisory.length?advisory.map((x,i)=>({t:'num',text:(CIRC[i]||'-')+' '+x})):[{t:'p',text:'해당 없음'}]}
  ];
  const tasks=latestMonthlyTasks(s),appendix=[];
- if(tasks.length)appendix.push({title:'주요 업무 현황 (월 내 최신 보고 기준)',head:['업무 분야','서비스','업무내용','담당','상태','진행률','목표 일정'],rows:tasks.slice().sort((a,b)=>String(a.project).localeCompare(String(b.project),'ko')).map(t=>[t.project||'',t.service||'',t.title||'',person(t.owner),t.state||'',(t.progress??'')+'%',t.target_date||'미지정'])});
+ if(tasks.length)appendix.push({title:'주요 업무 현황 (월 내 최신 보고 기준)',head:['업무 분야','서비스','업무내용','담당','상태','진행률','목표 일정'],rows:tasks.slice().sort((a,b)=>reportPlatforms.indexOf(platformOf(a.service))-reportPlatforms.indexOf(platformOf(b.service))||String(a.project).localeCompare(String(b.project),'ko')).map(t=>[t.project||'',t.service||'',t.title||'',person(t.owner),t.state||'',(t.progress??'')+'%',t.target_date||'미지정'])});
  const reports=(s.reports||[]).slice().sort((a,b)=>String(a.report_date||a.week_start).localeCompare(String(b.report_date||b.week_start))||person(a.user_id).localeCompare(person(b.user_id),'ko'));
  if(reports.length)appendix.push({title:'주간 보고 제출 현황',head:['작성일','보고 주간','보고자','업무 수'],rows:reports.map(r=>[dot(r.report_date||r.week_start),dot(r.week_start)+' 주',person(r.user_id),(r.items||[]).length+'건'])});
  for(const d of s.metrics?.sections?.[1]?.platform_details||[])if(d.detail_rows?.length)appendix.push({title:'비학술 세미나 완료 강의 · '+d.platform,head:d.detail_headers,rows:d.detail_rows.map(r=>r.map(x=>typeof x==='number'?x.toLocaleString('ko-KR',{maximumFractionDigits:2}):String(x??'')))});
@@ -128,7 +162,7 @@ export function monthlyReportModel(s){
   summaryTitle:'1. 보고 요약',summary:summaryLines(s),summaryNote:!ai?'※ 요약 미생성 · 보고서 생성 또는 요약 재시도를 실행하면 GPT 요약으로 바뀜':legacyAI?'※ 이전 양식으로 생성된 문서임 · 보고서를 다시 생성하면 새 요약이 포함됨':'',sections,appendix});
 }
 
-export const monthlyReportStyles='.rdoc{background:#fff;color:#111;max-width:794px;margin:0 auto;padding:48px 56px;border:1px solid #d9dde3;font-size:14.5px;line-height:1.7;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;box-sizing:border-box}.rdoc *{box-sizing:border-box}.rdoc .rd-title{text-align:center;font-size:19px;font-weight:700;margin:0 0 18px;letter-spacing:-.01em;word-break:keep-all;color:#111;border:0;padding:0}.rdoc .rd-meta{text-align:right;font-weight:700;margin:0;font-size:14px}.rdoc .rd-box{background:#EDEDED;border:1px solid #9a9a9a;padding:12px 16px;margin:18px 0 8px}.rdoc .rd-boxh{font-weight:700;margin:0 0 6px}.rdoc .rd-sum{margin:0 0 6px;padding-left:1.4em;text-indent:-1.4em;word-break:break-word}.rdoc .rd-h{font-size:14.5px;font-weight:700;margin:22px 0 8px;color:#111;border:0;padding:0}.rdoc p{margin:0;white-space:pre-wrap}.rdoc .rb-cat{font-weight:700;margin:12px 0 4px;color:#13213b}.rdoc .rb-goal{font-weight:700;margin:6px 0 3px;padding-left:.6em}.rdoc .rb-p{margin:0 0 3px;padding-left:1.6em;word-break:break-word}.rdoc .rb-item{margin:0 0 2px;padding-left:3.4em;text-indent:-1.6em;word-break:break-word}.rdoc .rb-bul{margin:0 0 3px;padding-left:3.4em;text-indent:-.8em;word-break:break-word}.rdoc .rb-num{margin:0 0 4px;padding-left:2.2em;text-indent:-1.2em;word-break:break-word}.rdoc .rb-note{margin:0 0 4px;padding-left:2.2em;font-size:11.5px;color:#555}.rdoc .rb-gap{height:6px}.rdoc .rd-th{font-weight:700;margin:14px 0 6px}.rdoc .tblwrap{overflow-x:auto}.rdoc .rd-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}.rdoc .rd-tbl th,.rdoc .rd-tbl td{border:1px solid #808080;padding:5px 7px;vertical-align:top;color:#111;white-space:pre-wrap;word-break:break-word}.rdoc .rd-tbl th{background:#EDEDED;font-weight:700;text-align:center;white-space:nowrap}.rdoc .rd-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rdoc .rd-tbl.wide{font-size:11px}.rdoc .rd-tbl.wide th,.rdoc .rd-tbl.wide td{white-space:pre-wrap}@media(max-width:600px){.rdoc{padding:22px 16px}.rdoc .rd-tbl{font-size:11px}}@media print{.rdoc{border:0;padding:0;max-width:none}.rdoc tr,.rdoc .rd-box{break-inside:avoid}.rdoc .rd-h,.rdoc .rd-th{break-after:avoid}}';
+export const monthlyReportStyles='.rdoc{background:#fff;color:#111;max-width:794px;margin:0 auto;padding:48px 56px;border:1px solid #d9dde3;font-size:14.5px;line-height:1.7;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;box-sizing:border-box}.rdoc *{box-sizing:border-box}.rdoc .rd-title{text-align:center;font-size:19px;font-weight:700;margin:0 0 18px;letter-spacing:-.01em;word-break:keep-all;color:#111;border:0;padding:0}.rdoc .rd-meta{text-align:right;font-weight:700;margin:0;font-size:14px}.rdoc .rd-box{background:#EDEDED;border:1px solid #9a9a9a;padding:12px 16px;margin:18px 0 8px}.rdoc .rd-boxh{font-weight:700;margin:0 0 6px}.rdoc .rd-sum{margin:0 0 6px;padding-left:1.4em;text-indent:-1.4em;word-break:break-word}.rdoc .rd-h{font-size:14.5px;font-weight:700;margin:22px 0 8px;color:#111;border:0;padding:0}.rdoc p{margin:0;white-space:pre-wrap}.rdoc .rb-plat{font-weight:700;font-size:15px;margin:16px 0 4px;color:#0b1a33;border-bottom:1px solid #c9ced6;padding-bottom:2px}.rdoc .rb-cat{font-weight:700;margin:12px 0 4px;color:#13213b}.rdoc .rb-goal{font-weight:700;margin:6px 0 3px;padding-left:.6em}.rdoc .rb-p{margin:0 0 3px;padding-left:1.6em;word-break:break-word}.rdoc .rb-item{margin:0 0 2px;padding-left:3.4em;text-indent:-1.6em;word-break:break-word}.rdoc .rb-bul{margin:0 0 3px;padding-left:3.4em;text-indent:-.8em;word-break:break-word}.rdoc .rb-num{margin:0 0 4px;padding-left:2.2em;text-indent:-1.2em;word-break:break-word}.rdoc .rb-note{margin:0 0 4px;padding-left:2.2em;font-size:11.5px;color:#555}.rdoc .rb-gap{height:6px}.rdoc .rd-th{font-weight:700;margin:14px 0 6px}.rdoc .tblwrap{overflow-x:auto}.rdoc .rd-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:6px}.rdoc .rd-tbl th,.rdoc .rd-tbl td{border:1px solid #808080;padding:5px 7px;vertical-align:top;color:#111;white-space:pre-wrap;word-break:break-word}.rdoc .rd-tbl th{background:#EDEDED;font-weight:700;text-align:center;white-space:nowrap}.rdoc .rd-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rdoc .rd-tbl.wide{font-size:11px}.rdoc .rd-tbl.wide th,.rdoc .rd-tbl.wide td{white-space:pre-wrap}@media(max-width:600px){.rdoc{padding:22px 16px}.rdoc .rd-tbl{font-size:11px}}@media print{.rdoc{border:0;padding:0;max-width:none}.rdoc tr,.rdoc .rd-box{break-inside:avoid}.rdoc .rd-h,.rdoc .rd-th{break-after:avoid}}';
 const lineHTML=l=>l.t==='gap'?'<div class="rb-gap"></div>':'<p class="rb-'+l.t+'">'+e(l.text)+'</p>';
 const tableHTML=(t,i)=>'<p class="rd-th">'+(i===undefined?'':(i+1)+'. ')+e(t.title)+'</p><div class="tblwrap"><table class="rd-tbl'+(t.wide?' wide':'')+'"><thead><tr>'+t.head.map(h=>'<th>'+e(h)+'</th>').join('')+'</tr></thead><tbody>'+(t.rows.length?t.rows.map(row=>'<tr>'+row.map((c,ci)=>'<td'+(t.numeric?.includes(ci)?' class="num"':'')+'>'+e(c)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+t.head.length+'">자료 없음</td></tr>')+'</tbody></table></div>';
 export function monthlyReportBody(s){
@@ -149,7 +183,7 @@ export function monthlyReportDocx(D,s){
  const kids=[para(r.title,{size:28,bold:true,align:AlignmentType.CENTER,after:200}),para(r.dateLine,{bold:true,align:AlignmentType.RIGHT,after:40}),para(r.metaLine,{bold:true,align:AlignmentType.RIGHT,after:200})];
  kids.push(new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({children:[new TableCell({borders,shading:{type:ShadingType.CLEAR,color:'auto',fill:G},margins:{top:120,bottom:120,left:160,right:160},
   children:[para('■ '+r.summaryTitle,{bold:true,after:100}),...(r.summary.length?r.summary:['요약할 내용이 없음']).map((x,i)=>para((i+1)+'. '+x,{after:80,indent:{left:300,hanging:300}})),...(r.summaryNote?[para(r.summaryNote,{size:17,color:'555555'})]:[])]})]})]}));
- const line=l=>l.t==='gap'?para('',{after:40}):l.t==='cat'?para(l.text,{bold:true,before:160,after:60}):l.t==='goal'?para(l.text,{bold:true,before:100,after:40,indent:{left:200}}):l.t==='item'?para(l.text,{indent:{left:900,hanging:380}}):l.t==='num'?para(l.text,{indent:{left:400,hanging:280}}):l.t==='bul'?para(l.text,{indent:{left:900,hanging:200}}):l.t==='note'?para(l.text,{size:17,color:'555555',indent:{left:400}}):para(l.text,{indent:{left:500}});
+ const line=l=>l.t==='gap'?para('',{after:40}):l.t==='plat'?para(l.text,{bold:true,size:24,before:240,after:80}):l.t==='cat'?para(l.text,{bold:true,before:160,after:60}):l.t==='goal'?para(l.text,{bold:true,before:100,after:40,indent:{left:200}}):l.t==='item'?para(l.text,{indent:{left:900,hanging:380}}):l.t==='num'?para(l.text,{indent:{left:400,hanging:280}}):l.t==='bul'?para(l.text,{indent:{left:900,hanging:200}}):l.t==='note'?para(l.text,{size:17,color:'555555',indent:{left:400}}):para(l.text,{indent:{left:500}});
  const tbl=t=>{const sz=t.head.length>6?16:18;const cell=(txt,head,ci)=>new TableCell({borders,shading:head?{type:ShadingType.CLEAR,color:'auto',fill:G}:undefined,margins:{top:30,bottom:30,left:60,right:60},children:[new Paragraph({alignment:head?AlignmentType.CENTER:(t.numeric?.includes(ci)?AlignmentType.RIGHT:undefined),children:String(txt??'').split('\n').map((x,i)=>new TextRun({text:x,font:F,size:sz,bold:head,break:i?1:0}))})]});
   return new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({tableHeader:true,children:t.head.map((h,ci)=>cell(h,true,ci))}),...(t.rows.length?t.rows:[['자료 없음',...t.head.slice(1).map(()=>'')]]).map(row=>new TableRow({cantSplit:true,children:row.map((c,ci)=>cell(c,false,ci))}))]});};
  for(const sec of r.sections){kids.push(para(sec.title,{bold:true,before:280,after:100}));kids.push(...sec.body.map(line));for(const t of sec.tables||[]){kids.push(para(t.title,{bold:true,before:160,after:80,size:20}));kids.push(tbl(t));}}
@@ -158,14 +192,14 @@ export function monthlyReportDocx(D,s){
 }
 
 // ---- 편집기: tf-worklog 편집 화면과 같은 본문 표기 ----
-// [분류] · 1. 업무 · (1) 세부 항목 · ① 번호 항목 · - 하위 항목 · ※ 주석 · 그 외 일반 문단 · 빈 줄은 간격
-const LINE_TYPES=['cat','goal','p','item','num','note','bul','gap'];
+// 가. 플랫폼 · [분류] · 1. 업무 · (1) 세부 항목 · ① 번호 항목 · - 하위 항목 · ※ 주석 · 그 외 일반 문단 · 빈 줄은 간격
+const LINE_TYPES=['plat','cat','goal','p','item','num','note','bul','gap'];
 export function linesToText(body){return (body||[]).map(l=>l.t==='gap'?'':l.t==='bul'?'- '+String(l.text||'').replace(/^·\s*/,''):String(l.text||'')).join('\n').replace(/\n+$/,'');}
 export function textToLines(text){
  const out=[];
  for(const raw of String(text||'').replace(/\r/g,'').split('\n')){const t=raw.trim();
   if(!t){if(out.length&&out.at(-1).t!=='gap')out.push({t:'gap'});continue;}
-  out.push(/^\[[^\]]+\]$/.test(t)?{t:'cat',text:t}:/^\d+\.\s/.test(t)?{t:'goal',text:t}:/^\(\d+\)/.test(t)?{t:'item',text:t}:/^[①-⑳]/.test(t)?{t:'num',text:t}:/^※/.test(t)?{t:'note',text:t}:/^[-•·]\s*/.test(t)?{t:'bul',text:'· '+t.replace(/^[-•·]\s*/,'')}:{t:'p',text:t});
+  out.push(/^[가-하]\.\s/.test(t)?{t:'plat',text:t}:/^\[[^\]]+\]$/.test(t)?{t:'cat',text:t}:/^\d+\.\s/.test(t)?{t:'goal',text:t}:/^\(\d+\)/.test(t)?{t:'item',text:t}:/^[①-⑳]/.test(t)?{t:'num',text:t}:/^※/.test(t)?{t:'note',text:t}:/^[-•·]\s*/.test(t)?{t:'bul',text:'· '+t.replace(/^[-•·]\s*/,'')}:{t:'p',text:t});
  }
  while(out.length&&out.at(-1).t==='gap')out.pop();return out;
 }
@@ -192,7 +226,7 @@ export function editorState(s){
 export function monthlyEditorHTML(st){
  const ta=(attr,val,rows)=>'<textarea '+attr+' rows="'+rows+'">'+e(val)+'</textarea>';
  const rowsFor=v=>Math.min(22,Math.max(4,String(v).split('\n').length+1));
- return '<form id="monthly-editor" class="monthly-editor"><p class="muted">본문 표기: <b>[분류]</b> · <b>1. 업무</b> · <b>(1) 세부 항목</b> · <b>① 번호 항목</b> · <b>- 하위 항목</b> · <b>※ 주석</b> · 그 외는 일반 문단. 저장하면 화면·저장소·Word·PDF·HTML에 반영됩니다.</p>'
+ return '<form id="monthly-editor" class="monthly-editor"><p class="muted">본문 표기: <b>가. 플랫폼</b> · <b>[분류]</b> · <b>1. 업무</b> · <b>(1) 세부 항목</b> · <b>① 번호 항목</b> · <b>- 하위 항목</b> · <b>※ 주석</b> · 그 외는 일반 문단. 저장하면 화면·저장소·Word·PDF·HTML에 반영됩니다.</p>'
   +'<div class="grid"><label>제목<input id="me-title" value="'+e(st.title)+'" maxlength="300"></label><label>보고일 줄<input id="me-date" value="'+e(st.dateLine)+'" maxlength="300"></label><label>보고기간 · 작성 줄<input id="me-meta" value="'+e(st.metaLine)+'" maxlength="300"></label></div>'
   +'<label>1. 보고 요약 (한 줄에 한 항목, 번호는 자동)'+ta('id="me-summary"',st.summary,rowsFor(st.summary))+'</label>'
   +st.sections.map((sec,i)=>'<section class="me-section"><h3>'+e(sec.title)+'</h3><label>본문'+ta('data-me-body="'+i+'"',sec.body,rowsFor(sec.body))+'</label>'

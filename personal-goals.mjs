@@ -1,5 +1,5 @@
-import {escapeHTML as e} from './core.mjs?v=20261102-report5';
-import {exportGoalSet} from './kpi-export.mjs?v=20261102-report5';
+import {escapeHTML as e} from './core.mjs?v=20261103-platform';
+import {exportGoalSet} from './kpi-export.mjs?v=20261103-platform';
 export const scoreBands=[100,90,80,70,60];
 export const isKpiManager=member=>member?.role==='admin';
 export const blankGoalRow=()=>({strategy_id:'',personal_goal:'',method:'',indicator:'',target_date:'',scores:Object.fromEntries(scoreBands.map(n=>[n,''])),remarks:''});
