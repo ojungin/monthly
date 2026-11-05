@@ -1,8 +1,8 @@
-import {aiNotes} from './report-ai.mjs?v=20261105-handover';
+import {aiNotes} from './report-ai.mjs?v=20261105-hoquarter';
 export function reporterNotes(s,field){const people=new Map();for(const r of s.reports){if(!people.has(r.user_id))people.set(r.user_id,[]);const value=String(r[field]||'').split(/\r?\n/).map(line=>line.replace(/^\s*(?:[•●○▪▫◦∙·‣⁃]+\s*|[-*]\s+)/u,'').trim()).filter(Boolean).join('\n');if(value&&!people.get(r.user_id).includes(value))people.get(r.user_id).push(value)}return [...people].map(([id,values])=>({name:s.members.find(m=>m.id===id)?.name||'알 수 없는 팀원',team:s.members.find(m=>m.id===id)?.team||'',text:values.join('\n')||'없음'}))}
-import {reportStyles} from './report-design.mjs?v=20261105-handover';
-import {metricsBody,dayShift} from './metrics.mjs?v=20261105-handover';
-import {escapeHTML as e,latestTeamReports} from './core.mjs?v=20261105-handover';
+import {reportStyles} from './report-design.mjs?v=20261105-hoquarter';
+import {metricsBody,dayShift} from './metrics.mjs?v=20261105-hoquarter';
+import {escapeHTML as e,latestTeamReports} from './core.mjs?v=20261105-hoquarter';
 export function weeklySnapshot(reports,members,week,author){
  const selected=latestTeamReports(reports,week);
  if(!selected.length)throw Error('선택한 주간까지 제출된 보고가 없습니다.');

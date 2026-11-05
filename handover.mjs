@@ -1,6 +1,6 @@
 // 인수인계서 — 작성자(인계자)에게 귀속되고, 인수인계하면 인수자에게 공유됩니다.
 // 인수자가 "확인 완료"를 누르면 인계자 목록에서 사라지며, 관리자/책임자는 전체를 확인합니다.
-import {escapeHTML as e} from './core.mjs?v=20261105-handover';
+import {escapeHTML as e} from './core.mjs?v=20261105-hoquarter';
 
 export const isHandoverManager=member=>member?.role==='admin';
 export const handoverStatus={draft:'작성 중',shared:'확인 대기',confirmed:'확인 완료'};
@@ -73,6 +73,40 @@ export function visibleHandovers(rows,member){
 }
 export function handoverTitle(h){const items=h.items||[];return (items[0]?.task||'(주요 업무 없음)')+(items.length>1?' 외 '+(items.length-1)+'건':'');}
 
+// ── 분기 최신화: 확인 완료 전 문서는 분기마다 한 번 이상 내용을 점검(최신화)해야 합니다. ──
+export const kstDate=value=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date(value));
+export function quarterOf(day){
+ const [y,m]=day.split('-').map(Number),q=Math.floor((m-1)/3)+1,first=(q-1)*3+1,last=new Date(Date.UTC(y,first+2,0)).getUTCDate();
+ const pad=n=>String(n).padStart(2,'0');
+ return {year:y,quarter:q,label:y+'년 '+q+'분기',start:y+'-'+pad(first)+'-01',end:y+'-'+pad(first+2)+'-'+pad(last)};
+}
+export const lastReviewed=h=>h.reviewed_at||h.updated_at||h.created_at;
+export function needsRefresh(h,today){
+ if(h.status==='confirmed')return false;
+ const at=lastReviewed(h);return !at||kstDate(at)<quarterOf(today).start;
+}
+export const staleHandovers=(rows,memberId,today)=>rows.filter(r=>r.owner_id===memberId&&needsRefresh(r,today));
+export function refreshReminder(count,today){
+ if(!count)return '';const q=quarterOf(today),[,mm,dd]=q.end.split('-').map(Number);
+ return q.label+'에 최신화하지 않은 인수인계서가 '+count+'건 있습니다. '+mm+'월 '+dd+'일까지 내용을 확인하고 최신화해주세요.';
+}
+// 로그인 직후 알림용: 본인 문서 중 최신화가 필요한 건수(저장소가 없으면 0).
+export async function staleHandoverCount(ctx,today){
+ try{
+  if(ctx.demo)return staleHandovers(demoRows(),ctx.member.id,today).length;
+  const {data,error}=await ctx.client.from('handovers').select('id,owner_id,status,reviewed_at,updated_at,created_at').eq('owner_id',ctx.member.id).neq('status','confirmed');
+  return error?0:staleHandovers(data,ctx.member.id,today).length;
+ }catch{return 0}
+}
+export async function markReviewed(ctx,row){
+ if(row.owner_id!==ctx.member.id||row.status==='confirmed')throw Error('확인 완료 전인 본인 문서만 최신화할 수 있습니다.');
+ const now=new Date().toISOString();
+ if(ctx.demo){demoSave(demoRows().map(r=>r.id===row.id?{...r,reviewed_at:now}:r));return;}
+ const {data,error}=await ctx.client.from('handovers').update({reviewed_at:now}).eq('id',row.id).eq('status',row.status).select();
+ if(error)throw Error('최신화하지 못했습니다: '+error.message);
+ if(!data.length)throw Error('문서 상태가 바뀌었습니다. 새로고침해주세요.');
+}
+
 // ── 저장소: 실제 DB(Supabase) 또는 데모(브라우저 저장소) ──
 const DEMO_KEY='teamwork-demo-handovers';
 function demoRows(){try{return JSON.parse(localStorage.getItem(DEMO_KEY)||'[]')}catch{return []}}
@@ -90,7 +124,7 @@ export async function saveHandover(ctx,row,{share=false}={}){
  if(share&&!receiver)throw Error('인수받을 사람을 선택해주세요.');
  if(receiver&&receiver===me)throw Error('본인에게는 인수인계할 수 없습니다.');
  const values={items,receiver_id:receiver,status:share?'shared':'draft'};
- if(ctx.demo){const now=new Date().toISOString(),rows=demoRows(),saved={...rows.find(r=>r.id===row.id),...values,id:row.id||crypto.randomUUID(),owner_id:me,created_at:row.created_at||now,updated_at:now,shared_at:share?now:null,confirmed_at:null};demoSave([saved,...rows.filter(r=>r.id!==saved.id)]);return saved;}
+ if(ctx.demo){const now=new Date().toISOString(),rows=demoRows(),saved={...rows.find(r=>r.id===row.id),...values,id:row.id||crypto.randomUUID(),owner_id:me,created_at:row.created_at||now,updated_at:now,reviewed_at:now,shared_at:share?now:null,confirmed_at:null};demoSave([saved,...rows.filter(r=>r.id!==saved.id)]);return saved;}
  let query=row.id?ctx.client.from('handovers').update(values).eq('id',row.id).eq('updated_at',row.updated_at):ctx.client.from('handovers').insert({...values,owner_id:me});
  const {data,error}=await query.select().single();
  if(error)throw Error('인수인계서를 저장하지 못했습니다. 새로고침 후 다시 시도해주세요. '+error.message);
@@ -168,7 +202,7 @@ export function handoverBody(h,members){
   +(h.items||[]).map((i,n)=>'<section class="handover-view-item"><h3>업무 '+(n+1)+'. '+e(i.task)+'</h3><h4>업무 세부 내용</h4><div class="rich-content">'+(sanitizeRichText(i.details)||'<p class="muted">없음</p>')+'</div><h4>참고 URL</h4>'+urlsHTML(i.urls)+'</section>').join('');
 }
 export async function handoverPage(ctx){
- const realMember=ctx.member;
+ const realMember=ctx.member,today=ctx.today||kstDate(Date.now()),quarter=quarterOf(today);
  if(ctx.demo){demoViewer||=realMember.id;ctx={...ctx,member:ctx.members.find(m=>m.id===demoViewer)||realMember};}
  const me=ctx.member,manager=isHandoverManager(me),name=id=>ctx.members.find(m=>m.id===id)?.name||'미지정';
  let rows=[],error='';
@@ -176,15 +210,18 @@ export async function handoverPage(ctx){
  if(!ctx.isActive())return;
  const reload=()=>handoverPage({...ctx,member:realMember});
  const received=rows.filter(r=>r.receiver_id===me.id&&r.status!=='draft'),mine=rows.filter(r=>r.owner_id===me.id&&r.status!=='confirmed');
+ const stale=staleHandovers(rows,me.id,today);if(!ctx.demo||me.id===realMember.id)ctx.setReminder?.(stale.length);
+ const refreshCell=r=>r.status==='confirmed'?'<span class="muted">-</span>':needsRefresh(r,today)?'<span class="pill hold">최신화 필요</span><br><span class="muted">최근 '+e(kstDate(lastReviewed(r)))+'</span>':'<span class="pill done">'+quarter.quarter+'분기 완료</span><br><span class="muted">'+e(kstDate(lastReviewed(r)))+'</span>';
  const pill=s=>'<span class="pill'+(s==='confirmed'?' done':s==='draft'?' hold':'')+'">'+e(handoverStatus[s]||s)+'</span>';
  const act=(k,id,label,primary)=>'<button type="button" data-ho-'+k+'="'+e(id)+'"'+(primary?' class="primary"':'')+'>'+label+'</button>';
  const table=(head,body,empty)=>body.length?'<div class="table-wrap"><table class="handover-table"><thead><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+body.join('')+'</tbody></table></div>':'<p class="empty">'+empty+'</p>';
  const demoSwitch=ctx.demo?'<label class="handover-demo-switch">데모 사용자 전환<select id="ho-viewer">'+ctx.members.map(m=>'<option value="'+e(m.id)+'"'+(m.id===me.id?' selected':'')+'>'+e(m.name)+(m.role==='admin'?' (관리자/책임자)':'')+'</option>').join('')+'</select></label>':'';
  ctx.shell('<div class="topline"><div><h1>인수인계서</h1><p>작성한 인수인계서는 본인에게만 보이며, 인수인계하면 인수자에게 공유됩니다. 인수자가 확인 완료하면 인계자 목록에서 사라집니다.</p></div><div class="actions">'+demoSwitch+'<button id="ho-refresh">새로고침</button><button id="ho-new" class="primary" '+(error?'disabled':'')+'>+ 작성</button></div></div>'
   +(error?'<section class="panel"><p class="error">'+e(error)+'</p><a href="https://github.com/ojungin/monthly/blob/main/supabase/handovers.sql" target="_blank" rel="noopener">DB 설정 SQL 보기</a></section>':
-  '<section class="panel"><h2>인수받은 인수인계서 <span class="muted">'+received.length+'건</span></h2>'+table(['주요 업무','인계자','상태','공유일','확인일','관리'],received.map(r=>'<tr><td>'+e(handoverTitle(r))+'</td><td>'+e(name(r.owner_id))+'</td><td>'+pill(r.status)+'</td><td>'+fmt(r.shared_at)+'</td><td>'+fmt(r.confirmed_at)+'</td><td class="actions">'+act('view',r.id,'보기')+(r.status==='shared'?act('confirm',r.id,'확인 완료',true):'')+'</td></tr>'),'인수받은 인수인계서가 없습니다.')+'</section>'
-  +'<section class="panel"><h2>내가 작성한 인수인계서 <span class="muted">'+mine.length+'건</span></h2>'+table(['주요 업무','인수자','상태','수정일','관리'],mine.map(r=>'<tr><td>'+e(handoverTitle(r))+'</td><td>'+e(r.receiver_id?name(r.receiver_id):'미지정')+'</td><td>'+pill(r.status)+'</td><td>'+fmt(r.updated_at)+'</td><td class="actions">'+act('view',r.id,'보기')+(r.status==='draft'?act('edit',r.id,'수정')+act('share',r.id,'인수인계',true)+act('delete',r.id,'삭제'):act('recall',r.id,'회수'))+'</td></tr>'),'작성한 인수인계서가 없습니다. 상단의 + 작성을 눌러 시작하세요.')+'</section>'
-  +(manager?'<section class="panel"><h2>전체 인수인계 현황 <span class="muted">관리자/책임자 · '+rows.length+'건</span></h2>'+table(['인계자','인수자','주요 업무','상태','공유일','확인일','관리'],rows.map(r=>'<tr><td>'+e(name(r.owner_id))+'</td><td>'+e(r.receiver_id?name(r.receiver_id):'미지정')+'</td><td>'+e(handoverTitle(r))+'</td><td>'+pill(r.status)+'</td><td>'+fmt(r.shared_at)+'</td><td>'+fmt(r.confirmed_at)+'</td><td>'+act('view',r.id,'보기')+'</td></tr>'),'등록된 인수인계서가 없습니다.')+'</section>':''))
+  (stale.length?'<div class="handover-reminder" role="alert"><strong>분기 최신화 알림</strong> '+e(refreshReminder(stale.length,today))+' 내용이 그대로라면 <b>최신화 확인</b>을, 바꿀 내용이 있으면 <b>수정</b> 후 저장해주세요. 인수인계 중인 문서는 회수 후 수정할 수 있습니다.</div>':'')
+  +'<section class="panel"><h2>인수받은 인수인계서 <span class="muted">'+received.length+'건</span></h2>'+table(['주요 업무','인계자','상태','공유일','확인일','관리'],received.map(r=>'<tr><td>'+e(handoverTitle(r))+'</td><td>'+e(name(r.owner_id))+'</td><td>'+pill(r.status)+'</td><td>'+fmt(r.shared_at)+'</td><td>'+fmt(r.confirmed_at)+'</td><td class="actions">'+act('view',r.id,'보기')+(r.status==='shared'?act('confirm',r.id,'확인 완료',true):'')+'</td></tr>'),'인수받은 인수인계서가 없습니다.')+'</section>'
+  +'<section class="panel"><h2>내가 작성한 인수인계서 <span class="muted">'+mine.length+'건</span></h2>'+table(['주요 업무','인수자','상태','최신화','관리'],mine.map(r=>'<tr'+(needsRefresh(r,today)?' class="handover-stale"':'')+'><td>'+e(handoverTitle(r))+'</td><td>'+e(r.receiver_id?name(r.receiver_id):'미지정')+'</td><td>'+pill(r.status)+'</td><td>'+refreshCell(r)+'</td><td class="actions">'+act('view',r.id,'보기')+act('review',r.id,'최신화 확인',needsRefresh(r,today))+(r.status==='draft'?act('edit',r.id,'수정')+act('share',r.id,'인수인계',true)+act('delete',r.id,'삭제'):act('recall',r.id,'회수'))+'</td></tr>'),'작성한 인수인계서가 없습니다. 상단의 + 작성을 눌러 시작하세요.')+'</section>'
+  +(manager?'<section class="panel"><h2>전체 인수인계 현황 <span class="muted">관리자/책임자 · '+rows.length+'건 · '+e(quarter.label)+' 최신화 필요 '+rows.filter(r=>needsRefresh(r,today)).length+'건</span></h2>'+table(['인계자','인수자','주요 업무','상태','최신화','공유일','확인일','관리'],rows.map(r=>'<tr'+(needsRefresh(r,today)?' class="handover-stale"':'')+'><td>'+e(name(r.owner_id))+'</td><td>'+e(r.receiver_id?name(r.receiver_id):'미지정')+'</td><td>'+e(handoverTitle(r))+'</td><td>'+pill(r.status)+'</td><td>'+refreshCell(r)+'</td><td>'+fmt(r.shared_at)+'</td><td>'+fmt(r.confirmed_at)+'</td><td>'+act('view',r.id,'보기')+'</td></tr>'),'등록된 인수인계서가 없습니다.')+'</section>':''))
   +'<dialog id="ho-dialog" class="handover-dialog" aria-labelledby="ho-dialog-title"></dialog>');
  const dialog=document.getElementById('ho-dialog'),find=id=>rows.find(r=>r.id===id);
  document.getElementById('ho-refresh').onclick=()=>ctx.run(reload);
@@ -229,6 +266,7 @@ export async function handoverPage(ctx){
  document.getElementById('ho-new').onclick=()=>openEditor(null);
  const on=(k,fn)=>document.querySelectorAll('[data-ho-'+k+']').forEach(b=>b.onclick=()=>fn(find(b.dataset['ho'+k[0].toUpperCase()+k.slice(1)])));
  on('view',openView);on('edit',h=>openEditor(h));on('share',h=>openEditor(h,true));on('confirm',confirmDone);
+ on('review',h=>ctx.run(async()=>{if(!confirm('현재 내용이 최신 상태인지 확인하셨나요? '+quarter.label+' 최신화로 기록합니다.'))return;await markReviewed(ctx,h);ctx.toast('최신화했습니다.');await reload();}));
  on('recall',h=>ctx.run(async()=>{if(!confirm('인수인계를 회수할까요? 인수자에게 더 이상 보이지 않고 다시 수정할 수 있습니다.'))return;await changeStatus(ctx,h,'draft');ctx.toast('인수인계를 회수했습니다.');await reload();}));
  on('delete',h=>ctx.run(async()=>{if(!confirm('이 인수인계서를 삭제할까요?'))return;await removeHandover(ctx,h);ctx.toast('삭제했습니다.');await reload();}));
 }

@@ -1,4 +1,4 @@
-import {escapeHTML as e} from './core.mjs?v=20261105-handover';
+import {escapeHTML as e} from './core.mjs?v=20261105-hoquarter';
 export const metricsHeading='2. 주요 지표';
 export const metricTitles=['2-1. 회원 및 활동성','2-2. 비학술 세미나 기획 및 운영','2-3. 포인트 지급·사용·잔여'];
 export const sources=[

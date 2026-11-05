@@ -55,3 +55,31 @@ test('database policy hides confirmed handovers from the owner and lets admins r
  assert.match(sql,/public\.is_admin\(\)/);
  assert.match(sql,/me=old\.receiver_id and new\.status='confirmed'/);
 });
+import {quarterOf,needsRefresh,staleHandovers,refreshReminder,markReviewed} from '../handover.mjs';
+test('quarters follow the calendar in KST and documents need one refresh per quarter',()=>{
+ assert.deepEqual(quarterOf('2026-11-05'),{year:2026,quarter:4,label:'2026년 4분기',start:'2026-10-01',end:'2026-12-31'});
+ assert.equal(quarterOf('2024-02-10').end,'2024-03-31');assert.equal(quarterOf('2026-05-01').start,'2026-04-01');
+ const today='2026-11-05';
+ assert.equal(needsRefresh({status:'draft',reviewed_at:'2026-10-01T00:30:00+09:00'},today),false);
+ assert.equal(needsRefresh({status:'shared',reviewed_at:'2026-09-30T23:30:00+09:00'},today),true);
+ assert.equal(needsRefresh({status:'shared',reviewed_at:'2026-09-30T15:30:00Z'},today),false,'KST 10/1 00:30');
+ assert.equal(needsRefresh({status:'confirmed',reviewed_at:'2025-01-01T00:00:00Z'},today),false);
+ assert.equal(needsRefresh({status:'draft',updated_at:'2026-07-01T00:00:00Z'},today),true,'falls back to updated_at');
+ const rows=[{owner_id:'a',status:'draft',reviewed_at:'2026-07-01T00:00:00Z'},{owner_id:'a',status:'draft',reviewed_at:'2026-11-01T00:00:00Z'},{owner_id:'b',status:'shared',reviewed_at:'2026-07-01T00:00:00Z'}];
+ assert.equal(staleHandovers(rows,'a',today).length,1);
+ assert.equal(refreshReminder(2,today),'2026년 4분기에 최신화하지 않은 인수인계서가 2건 있습니다. 12월 31일까지 내용을 확인하고 최신화해주세요.');
+ assert.equal(refreshReminder(0,today),'');
+});
+test('only the owner can mark an unconfirmed handover as reviewed, guarded by status',async()=>{
+ await assert.rejects(markReviewed({member:{id:'b'}},{owner_id:'a',status:'draft'}),/본인/);
+ await assert.rejects(markReviewed({member:{id:'a'}},{owner_id:'a',status:'confirmed'}),/본인/);
+ const calls=[];const q={eq:(k,v)=>{calls.push([k,v]);return q},select:async()=>({data:[{}],error:null})};
+ await markReviewed({member:{id:'a'},client:{from:()=>({update:v=>{calls.push(Object.keys(v));return q}})}},{id:'1',owner_id:'a',status:'shared'});
+ assert.deepEqual(calls,[['reviewed_at'],['id','1'],['status','shared']]);
+});
+test('app shows a reminder banner, menu badge and login toast; SQL records reviews',async()=>{
+ const app=await readFile(new URL('../app.js',import.meta.url),'utf8'),sql=await readFile(new URL('../supabase/handovers.sql',import.meta.url),'utf8');
+ assert.match(app,/인수인계서 최신화 알림/);assert.match(app,/'kpi-handover':handoverReminder/);assert.match(app,/checkHandoverReminder\(\)/);
+ assert.match(navigationHTML('dashboard',false,{'kpi-handover':2}),/nav-badge[^>]*>2</);
+ assert.match(sql,/add column if not exists reviewed_at/);assert.match(sql,/old\.status='shared' and me=old\.owner_id and new\.status='shared'/);
+});

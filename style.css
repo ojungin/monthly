@@ -62,3 +62,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:13px 12px
 .rich-content{overflow-wrap:anywhere}.rich-content table{border-collapse:collapse;width:100%;margin:10px 0;table-layout:auto}.rich-content th,.rich-content td{border:1px solid #9AA0A6;padding:6px 8px;min-width:48px;vertical-align:top;background:white}.rich-content th{background:var(--surface)}.rich-content p{margin:0 0 6px}
 .handover-view-item{background:white;border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:16px}.handover-view-item h3{color:var(--primary)}.handover-view-item h4{font-size:13px;color:var(--sub);margin:14px 0 6px}.handover-urls{margin:0;padding-left:20px}
 @media(max-width:600px){.handover-dialog{width:100vw;height:100vh;border-radius:0}.handover-form>header,.handover-dialog-body,.handover-form>footer{padding-left:16px;padding-right:16px}.handover-form>footer label{min-width:0;width:100%}}
+.nav-badge{display:inline-block;min-width:20px;padding:1px 6px;margin-left:6px;border-radius:10px;background:#E5484D;color:white;font-size:11px;font-weight:700;text-align:center;line-height:18px}
+.handover-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.handover-banner button{padding:6px 12px;font-size:13px}
+.handover-reminder{background:#FFF7E8;border:1px solid #F2DBAE;color:#745519;border-radius:10px;padding:14px 18px;margin-bottom:20px;line-height:1.7}.handover-reminder strong{margin-right:6px}
+.handover-table tr.handover-stale td{background:#FFFBF2}
+.handover-table td.actions{display:table-cell}.handover-table td.actions button{margin:0 4px 6px 0}

@@ -2,6 +2,8 @@
 -- 인계자 본인: 확인 완료 전까지 열람 · 작성 중일 때만 수정/삭제 · 확인 전 회수 가능
 -- 인수자: 공유된 뒤부터 열람 · 확인 완료 처리
 -- 관리자/책임자(members.role='admin'): 전체 열람
+-- 분기 최신화: 인계자가 저장하거나 '최신화 확인'을 누르면 reviewed_at이 갱신됩니다.
+-- 이미 적용한 뒤 다시 실행해도 기존 데이터는 그대로 유지됩니다.
 begin;
 create table if not exists public.handovers(
  id uuid primary key default gen_random_uuid(),
@@ -13,9 +15,11 @@ create table if not exists public.handovers(
  updated_at timestamptz not null default now(),
  shared_at timestamptz,
  confirmed_at timestamptz,
+ reviewed_at timestamptz not null default now(),
  check(status='draft' or receiver_id is not null),
  check(receiver_id is distinct from owner_id)
 );
+alter table public.handovers add column if not exists reviewed_at timestamptz not null default now();
 create index if not exists handovers_owner_idx on public.handovers(owner_id,status);
 create index if not exists handovers_receiver_idx on public.handovers(receiver_id,status);
 
@@ -33,20 +37,24 @@ begin
   end loop;
  end loop;
  if tg_op='INSERT' then
-  new.owner_id=me;new.created_at=now();new.confirmed_at=null;
+  new.owner_id=me;new.created_at=now();new.confirmed_at=null;new.reviewed_at=clock_timestamp();
   if new.status not in('draft','shared') then raise exception '잘못된 상태'; end if;
   new.shared_at=case when new.status='shared' then clock_timestamp() end;
  else
   if new.owner_id is distinct from old.owner_id or new.created_at is distinct from old.created_at then raise exception '인계자 및 최초 작성일 변경 불가'; end if;
   if old.status='draft' and me=old.owner_id and new.status in('draft','shared') then
-   new.shared_at=case when new.status='shared' then clock_timestamp() end;new.confirmed_at=null;
+   new.shared_at=case when new.status='shared' then clock_timestamp() end;new.confirmed_at=null;new.reviewed_at=clock_timestamp();
+  elsif old.status='shared' and me=old.owner_id and new.status='shared' then
+   -- 인수인계 중 '최신화 확인': 내용·인수자는 그대로 두고 최신화 시각만 기록합니다.
+   if new.items is distinct from old.items or new.receiver_id is distinct from old.receiver_id then raise exception '인수인계 중에는 회수 후 수정해주세요'; end if;
+   new.shared_at=old.shared_at;new.confirmed_at=null;new.reviewed_at=clock_timestamp();
   elsif old.status='shared' and me=old.owner_id and new.status='draft' then
    -- 확인 전 회수: 내용은 그대로 두고 작성 중으로 되돌립니다.
    if new.items is distinct from old.items then raise exception '회수와 수정은 따로 진행해주세요'; end if;
-   new.shared_at=null;new.confirmed_at=null;
+   new.shared_at=null;new.confirmed_at=null;new.reviewed_at=old.reviewed_at;
   elsif old.status='shared' and me=old.receiver_id and new.status='confirmed' then
    if new.items is distinct from old.items or new.receiver_id is distinct from old.receiver_id then raise exception '인수자는 내용을 변경할 수 없습니다'; end if;
-   new.shared_at=old.shared_at;new.confirmed_at=clock_timestamp();
+   new.shared_at=old.shared_at;new.confirmed_at=clock_timestamp();new.reviewed_at=old.reviewed_at;
   else
    raise exception '허용되지 않은 인수인계서 변경입니다';
   end if;

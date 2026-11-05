@@ -1,6 +1,6 @@
 // 월 성과 보고서 — tf-worklog '보고의 건' 양식(보고요약 회색 박스, 회색 머리글 표, A4 Word)을 따릅니다.
 // 보고서는 하나의 모델(monthlyReportModel)에서 화면·HTML·PDF·Word를 모두 만듭니다.
-import {escapeHTML as e} from './core.mjs?v=20261105-handover';
+import {escapeHTML as e} from './core.mjs?v=20261105-hoquarter';
 
 export const workCategories=['콘텐츠 운영','플랫폼 운영','콘텐츠 신규','플랫폼 신규','AX/업무 효율화','AX/신규','기타'];
 export const reportPlatforms=['닥터빌','팜빌','배터빌','공통'];
