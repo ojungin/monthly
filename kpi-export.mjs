@@ -1,5 +1,5 @@
-import {escapeHTML as e} from './core.mjs?v=20261105-hoquarter';
-import {goalSetTable,rowContext,scoreBands} from './personal-goals.mjs?v=20261105-hoquarter';
+import {escapeHTML as e} from './core.mjs?v=20261105-memberadmin';
+import {goalSetTable,rowContext,scoreBands} from './personal-goals.mjs?v=20261105-memberadmin';
 const widths=[120,190,190,250,200,200,160,125,115,115,115,115,115,180],total=widths.reduce((a,b)=>a+b,0);
 export function personalGoalHTML(set,members,strategies,goals){const name=members.find(m=>m.id===set.user_id)?.name||'미등록';const table=goalSetTable(set,members,strategies,goals,false).replace(/width:(\d+)px/g,(_,n)=>'width:'+(Number(n)/total*100)+'%');return '<article class="personal-export"><style>.personal-export{font:14px "Malgun Gothic",Arial,sans-serif;color:#222;background:white;padding:14px}.personal-export h1{font-size:23px;margin:0 0 8px}.personal-export p{font-size:13px}.personal-export table{border-collapse:collapse;table-layout:fixed;width:100%}.personal-export th,.personal-export td{border:1px solid #888;padding:8px 6px;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6}.personal-export th{background:#EAEEF2;text-align:center;vertical-align:middle}.personal-export tbody tr{height:115px;break-inside:avoid}.personal-export .detail{white-space:pre-wrap}@page{size:A3 landscape;margin:10mm}</style><h1>'+set.year+'년 개인 목표 설정 · '+e(name)+'</h1><p>반기/분기 실행 계획과 연계한 개인 목표 · 평가점수별 기준 및 비고</p>'+table+'</article>';}
 let excelPromise,pdfPromise;

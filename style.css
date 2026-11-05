@@ -67,3 +67,4 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:13px 12px
 .handover-reminder{background:#FFF7E8;border:1px solid #F2DBAE;color:#745519;border-radius:10px;padding:14px 18px;margin-bottom:20px;line-height:1.7}.handover-reminder strong{margin-right:6px}
 .handover-table tr.handover-stale td{background:#FFFBF2}
 .handover-table td.actions{display:table-cell}.handover-table td.actions button{margin:0 4px 6px 0}
+.account-table tr.account-dup td{background:#FFF1EF}.account-table td button{padding:6px 10px;font-size:13px}

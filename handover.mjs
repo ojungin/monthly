@@ -1,6 +1,6 @@
 // 인수인계서 — 작성자(인계자)에게 귀속되고, 인수인계하면 인수자에게 공유됩니다.
 // 인수자가 "확인 완료"를 누르면 인계자 목록에서 사라지며, 관리자/책임자는 전체를 확인합니다.
-import {escapeHTML as e} from './core.mjs?v=20261105-hoquarter';
+import {escapeHTML as e} from './core.mjs?v=20261105-memberadmin';
 
 export const isHandoverManager=member=>member?.role==='admin';
 export const handoverStatus={draft:'작성 중',shared:'확인 대기',confirmed:'확인 완료'};
