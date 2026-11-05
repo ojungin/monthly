@@ -1,4 +1,4 @@
-import {escapeHTML as e,monday} from './core.mjs?v=20261105-memberadmin';
+import {escapeHTML as e,monday} from './core.mjs?v=20261105-memberrole';
 export const goalKey=(set,index)=>set.id+':'+index;
 export function goalCatalog(sets){return sets.flatMap(s=>(s.rows||[]).map((row,index)=>({...row,id:goalKey(s,index),user_id:s.user_id,year:s.year}))).filter(r=>r.personal_goal?.trim());}
 export function weeklyGoalProgress(goal,reports,week){

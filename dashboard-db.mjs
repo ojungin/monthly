@@ -1,5 +1,5 @@
-import {loadSupabase} from './supabase-loader.mjs?v=20261105-memberadmin';
-import {emptyMetrics,activityMetrics,pointMetrics,isoWeek,dayShift,numberValue,loadSeminarMetrics} from './metrics.mjs?v=20261105-memberadmin';
+import {loadSupabase} from './supabase-loader.mjs?v=20261105-memberrole';
+import {emptyMetrics,activityMetrics,pointMetrics,isoWeek,dayShift,numberValue,loadSeminarMetrics} from './metrics.mjs?v=20261105-memberrole';
 let database;
 export async function dashboardClient(){if(database)return database;const response=await fetch('https://ojungin.github.io/doctorville_dash/data/config.json',{cache:'no-cache'});if(!response.ok)throw Error('통계 DB 연결 설정을 불러오지 못했습니다.');const cfg=await response.json();if(!cfg.supabaseUrl||!cfg.supabaseAnonKey)throw Error('Dashboard_DV 연결 정보가 없습니다.');const {createClient}=await loadSupabase();database=createClient(cfg.supabaseUrl,cfg.supabaseAnonKey,{auth:{persistSession:false,detectSessionInUrl:false,autoRefreshToken:true}});return database;}
 export async function dashboardSession(){const db=await dashboardClient();const {data,error}=await db.auth.getSession();if(error)throw error;return data.session;}
@@ -107,7 +107,7 @@ export function monthlyDatabaseSummary(records,month,seminars){
  return summary;
 }
 export async function loadMonthlyDatabaseMetrics(month,options={}){
- const {querySeminarSheet,parseGVizResponse,seminarRowsFromTable}=await import('./metrics.mjs?v=20261105-memberadmin');
+ const {querySeminarSheet,parseGVizResponse,seminarRowsFromTable}=await import('./metrics.mjs?v=20261105-memberrole');
  let records=options.records;
  if(!records){const db=await dashboardClient();if(!await dashboardSession())throw Error('통계 DB 계정을 연결해주세요.');
   const result=await Promise.all(['dv','pv'].map(svc=>db.from('datasets').select('key,data,fetched_at').like('key','report|'+svc+'|%').order('fetched_at',{ascending:false}).limit(1)));

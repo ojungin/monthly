@@ -1,4 +1,4 @@
-import {escapeHTML as e} from './core.mjs?v=20261105-memberadmin';
+import {escapeHTML as e} from './core.mjs?v=20261105-memberrole';
 export const canManageResponsibilities=member=>member?.role==='admin';
 export function responsibilityValues(row){
  const result={};

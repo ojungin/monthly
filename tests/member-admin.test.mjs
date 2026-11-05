@@ -29,3 +29,10 @@ test('edge function checks the caller is an admin before using the service key, 
  assert.match(sql,/not exists\(select 1 from public\.members m where m\.id=auth\.uid\(\) and m\.role='admin'\) then raise exception/);assert(!/if not public\.is_admin\(\)/.test(sql));
  const app=await readFile(new URL('../app.js',import.meta.url),'utf8');assert.match(app,/createMemberAccount\(\{client,member:me\}/);assert(!app.includes("rpc('register_team_member'"));
 });
+test('role changes are admin-only, logged, never self-service and keep at least one admin',async()=>{
+ const sql=await readFile(new URL('../supabase/member-roles.sql',import.meta.url),'utf8'),app=await readFile(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(sql,/not exists\(select 1 from public\.members m where m\.id=me and m\.role='admin'\) then raise exception/);
+ assert.match(sql,/member_id=me then raise exception/);assert.match(sql,/마지막 관리자/);assert.match(sql,/for update/);
+ assert.match(sql,/insert into public\.member_role_changes/);assert.match(sql,/revoke all on function public\.set_member_role\(uuid,text\) from public,anon/);
+ assert.match(app,/client\.rpc\('set_member_role',\{member_id:target\.id,new_role:role\}\)/);
+});

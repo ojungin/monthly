@@ -1,5 +1,5 @@
 // 팀원 관리: 관리자/책임자가 사이트에서 로그인 계정을 만들고 팀원으로 등록합니다(Edge Function member-admin).
-import {escapeHTML as e} from './core.mjs?v=20261105-memberadmin';
+import {escapeHTML as e} from './core.mjs?v=20261105-memberrole';
 export const canRegisterMembers=member=>member?.role==='admin';
 export function memberInput(v){
  const email=String(v.email??'').trim().toLowerCase(),name=String(v.name??'').trim(),team=String(v.team??'').trim();

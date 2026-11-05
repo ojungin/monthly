@@ -1,9 +1,9 @@
-import {metricsBody} from './metrics.mjs?v=20261105-memberadmin';
-import {monthlyReportBody,monthlyReportDocx} from './monthly-report.mjs?v=20261105-memberadmin';
-import {reportStyles} from './report-design.mjs?v=20261105-memberadmin';
-import {weeklyExcelBlob} from './excel.mjs?v=20261105-memberadmin';
-import {escapeHTML as e,monday} from './core.mjs?v=20261105-memberadmin';
-import {groupedNotes,weeklyBody} from './weekly.mjs?v=20261105-memberadmin';
+import {metricsBody} from './metrics.mjs?v=20261105-memberrole';
+import {monthlyReportBody,monthlyReportDocx} from './monthly-report.mjs?v=20261105-memberrole';
+import {reportStyles} from './report-design.mjs?v=20261105-memberrole';
+import {weeklyExcelBlob} from './excel.mjs?v=20261105-memberrole';
+import {escapeHTML as e,monday} from './core.mjs?v=20261105-memberrole';
+import {groupedNotes,weeklyBody} from './weekly.mjs?v=20261105-memberrole';
 export const menus=[['dashboard','홈'],['write','금주 업무 보고 작성'],['edit','주간 업무 보고 수정'],['weekly','통합 보고서 생성'],['files','주간 보고서 저장소'],['monthly','월 성과 보고서 생성'],['monthly-files','월 성과 보고서 저장소'],['members','팀원 관리']];
 export function shiftDay(day,n){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 export function latestDocuments(docs){const m=new Map();for(const d of [...docs].sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id))){const k=d.kind+':'+d.period;if(!m.has(k))m.set(k,d)}return [...m.values()]}
