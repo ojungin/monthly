@@ -10,3 +10,9 @@ export function validateItems(items){if(!items.length)throw Error('업무를 한
 export function latestTeamReports(reports,week){const latest=new Map();for(const r of reports.filter(r=>r.status==='submitted'&&r.week_start<=week).slice().sort((a,b)=>b.week_start.localeCompare(a.week_start)||String(b.updated_at||'').localeCompare(String(a.updated_at||''))||String(b.id||'').localeCompare(String(a.id||''))))if(!latest.has(r.user_id))latest.set(r.user_id,r);return [...latest.values()]}
 
 export function filterTeamTasks(reports,filters={}){const byTask=new Map();for(const r of reports.filter(r=>r.status==='submitted'&&(!filters.month||r.week_start.startsWith(filters.month))&&(!filters.owner||r.user_id===filters.owner)).slice().sort((a,b)=>b.week_start.localeCompare(a.week_start)||String(b.updated_at||'').localeCompare(String(a.updated_at||''))))r.items.forEach((item,n)=>{const key=r.user_id+':'+(item.id||r.id+'-'+n);if(!byTask.has(key))byTask.set(key,{...item,owner:r.user_id,sourceWeek:r.week_start})});return [...byTask.values()].filter(i=>!filters.state||i.state===filters.state)}
+// 메일 인증코드 로그인 오류를 팀원이 이해할 수 있는 문장으로 바꿉니다.
+export function otpErrorMessage(error){const code=String(error?.code||''),message=String(error?.message||error||''),text=code+' '+message;
+ if(/otp_disabled|signup|not allowed|user_not_found|user not found/i.test(text))return '등록된 팀원 이메일이 아닙니다. 관리자에게 계정 등록을 요청해주세요.';
+ if(error?.status===429||/rate.?limit|security purposes|after \d+ seconds/i.test(text))return '인증코드 요청이 많아 잠시 제한되었습니다. 1분 후 다시 시도해주세요.';
+ if(/otp_expired|expired|invalid|token/i.test(text))return '인증코드가 맞지 않거나 만료되었습니다. 코드를 다시 받아주세요.';
+ return '인증 처리 중 문제가 발생했습니다: '+message;}

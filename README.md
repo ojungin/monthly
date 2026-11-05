@@ -32,10 +32,11 @@ GitHub Settings > Pages > Build and deployment > Source를 **GitHub Actions**로
 
 ## 2. Supabase 공용 저장소
 1. Supabase 프로젝트를 만든 후 SQL Editor에서 supabase/schema.sql 전체를 실행합니다.
-2. Authentication 설정에서 공개 회원가입을 끄고, 관리자만 사용자를 생성하도록 운영합니다. 이메일/비밀번호 로그인을 사용합니다.
-3. Authentication > URL Configuration에서 Site URL과 Redirect URLs에 실제 GitHub Pages 주소를 등록합니다. 비밀번호 재설정/초대 이메일을 사용하려면 이메일 전송 설정도 확인합니다.
-4. Authentication > Users에서 팀원 계정을 생성합니다. 최초 비밀번호를 관리자가 배포하지 않으려면 초대 이메일 또는 재설정 메일을 이용합니다.
-5. 각 사용자의 UUID로 members 테이블에 팀원 등록을 합니다. 등록 전에는 보고를 볼 수 없습니다.
+2. Authentication 설정에서 공개 회원가입을 끄고, 관리자만 사용자를 생성하도록 운영합니다. 로그인은 **이메일 인증코드(OTP)** 방식이며 비밀번호를 쓰지 않습니다. 앱은 `shouldCreateUser:false`로 요청하므로 등록되지 않은 이메일로는 계정이 만들어지지 않습니다.
+3. Authentication > Emails > Templates의 **Magic Link** 템플릿에 인증코드 `{{ .Token }}`를 넣습니다. 이 템플릿이 링크(`{{ .ConfirmationURL }}`)만 담고 있으면 코드가 메일에 표시되지 않습니다. 예시 본문: `<h2>팀워크 로그인 인증코드</h2><p>아래 코드를 로그인 화면에 입력하세요.</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">{{ .Token }}</p><p>본인이 요청하지 않았다면 이 메일을 무시하세요.</p>`
+4. Authentication > Providers > Email에서 Email 공급자가 켜져 있는지, Email OTP 만료 시간(기본 3600초)과 코드 길이(기본 6자리)를 확인합니다. Supabase 기본 메일 서버는 발송 한도가 매우 낮으므로 팀원 전체가 쓰려면 Authentication > Emails > SMTP Settings에서 회사 메일 서버(커스텀 SMTP)를 연결합니다. URL Configuration의 Site URL과 Redirect URLs에는 실제 GitHub Pages 주소를 등록해 둡니다(초대 메일 링크용).
+5. Authentication > Users에서 팀원 계정을 생성합니다(Add user > Create new user, 비밀번호 없이 이메일만 입력하고 Auto Confirm 선택 또는 초대 메일 발송).
+6. 각 사용자의 UUID로 members 테이블에 팀원 등록을 합니다. 등록 전에는 보고를 볼 수 없습니다.
 
 ```sql
 insert into public.members (id, name, team)
