@@ -1,4 +1,4 @@
-import {escapeHTML as e} from './core.mjs?v=20261105-emailotp';
+import {escapeHTML as e} from './core.mjs?v=20261105-handover';
 export const canManageResponsibilities=member=>member?.role==='admin';
 export function responsibilityValues(row){
  const result={};

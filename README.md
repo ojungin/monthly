@@ -65,3 +65,10 @@ http://127.0.0.1:4173 에서 데모를 확인합니다. Supabase SDK는 연결 �
 두 테스트 계정으로: A의 임시저장이 B에게 보이지 않는지, A의 제출 보고는 B에게 보이는지, B가 A의 보고를 수정할 수 없는지 확인하세요. 비등록/로그아웃 상태에서는 보고 조회가 차단되어야 합니다. 월 경계 보고의 귀속과 CSV 한글 표시도 확인하세요. DB 정책은 SQL에 포함되어 있으나 실제 프로젝트 적용 및 권한 테스트는 아직 실행되지 않았습니다.
 
 공식 문서: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site 및 https://supabase.com/docs/guides/database/postgres/row-level-security
+
+## 인수인계서 (KPI 관리 > 인수인계서)
+SQL Editor에서 `supabase/handovers.sql`을 실행해야 메뉴가 동작합니다.
+- 작성한 인수인계서는 작성자(인계자) 계정에 귀속되고 본인에게만 보입니다.
+- 인수인계를 누르면 지정한 인수자에게 공유됩니다. 인수자가 확인하기 전에는 회수해 다시 고칠 수 있습니다.
+- 인수자가 "확인 완료"를 누르면 인계자 목록에서 사라집니다. 인수자는 확인 완료한 문서를 계속 볼 수 있습니다.
+- 관리자/책임자(members.role='admin')는 모든 인수인계서를 확인할 수 있습니다.
