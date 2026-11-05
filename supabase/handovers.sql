@@ -71,7 +71,7 @@ grant select,insert,update,delete on public.handovers to authenticated;
 drop policy if exists handovers_read on public.handovers;
 create policy handovers_read on public.handovers for select to authenticated using(
  public.is_member() and (
-  public.is_admin()
+  exists(select 1 from public.members m where m.id=(select auth.uid()) and m.role='admin')
   or (owner_id=(select auth.uid()) and status<>'confirmed')
   or (receiver_id=(select auth.uid()) and status<>'draft')));
 drop policy if exists handovers_add on public.handovers;

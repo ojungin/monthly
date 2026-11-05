@@ -26,6 +26,6 @@ test('edge function checks the caller is an admin before using the service key, 
  assert.match(fn,/email_confirm:true/);assert.match(fn,/role:'member'/);assert.match(fn,/DELETE/);assert(!/^import /m.test(fn));
  assert.match(sql,/revoke all on function public\.auth_user_id_by_email\(text\) from public,anon,authenticated/);
  assert.match(sql,/grant execute on function public\.auth_user_id_by_email\(text\) to service_role/);
- assert.match(sql,/if not public\.is_admin\(\) then raise exception/);
+ assert.match(sql,/not exists\(select 1 from public\.members m where m\.id=auth\.uid\(\) and m\.role='admin'\) then raise exception/);assert(!/if not public\.is_admin\(\)/.test(sql));
  const app=await readFile(new URL('../app.js',import.meta.url),'utf8');assert.match(app,/createMemberAccount\(\{client,member:me\}/);assert(!app.includes("rpc('register_team_member'"));
 });

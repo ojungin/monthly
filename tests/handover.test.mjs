@@ -52,7 +52,7 @@ test('database policy hides confirmed handovers from the owner and lets admins r
  const sql=await readFile(new URL('../supabase/handovers.sql',import.meta.url),'utf8');
  assert.match(sql,/owner_id=\(select auth\.uid\(\)\) and status<>'confirmed'/);
  assert.match(sql,/receiver_id=\(select auth\.uid\(\)\) and status<>'draft'/);
- assert.match(sql,/public\.is_admin\(\)/);
+ assert.match(sql,/exists\(select 1 from public\.members m where m\.id=\(select auth\.uid\(\)\) and m\.role='admin'\)/);
  assert.match(sql,/me=old\.receiver_id and new\.status='confirmed'/);
 });
 import {quarterOf,needsRefresh,staleHandovers,refreshReminder,markReviewed} from '../handover.mjs';

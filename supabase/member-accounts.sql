@@ -14,7 +14,8 @@ create or replace function public.admin_member_accounts()
 returns table(id uuid,email text,created_at timestamptz,last_sign_in_at timestamptz,is_member boolean)
 language plpgsql stable security definer set search_path='' as $$
 begin
- if not public.is_admin() then raise exception '관리자/책임자만 조회할 수 있습니다'; end if;
+ -- public.is_admin() 대신 로그인 계정의 members.role을 직접 확인합니다(executive-report.sql과 같은 방식).
+ if auth.uid() is null or not exists(select 1 from public.members m where m.id=auth.uid() and m.role='admin') then raise exception '관리자/책임자만 조회할 수 있습니다'; end if;
  return query select u.id,u.email::text,u.created_at,u.last_sign_in_at,exists(select 1 from public.members m where m.id=u.id)
   from auth.users u order by lower(u.email),u.created_at;
 end $$;
