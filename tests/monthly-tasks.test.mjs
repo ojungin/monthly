@@ -45,11 +45,14 @@ test('editor notation keeps the platform level',()=>{
  const s=snap();s.ai_summary=G();const r=monthlyReportModel(s),t=linesToText(r.sections[1].body);
  assert.deepEqual(textToLines(t),r.sections[1].body);
 });
-test('group output is validated: unknown keys, bad platform and long lists rejected; duplicates removed; schema bounds',()=>{
+test('group output is sanitized instead of failing the whole report; weekly drops groups; duplicates removed; schema bounds',()=>{
  const base={overview:[],issues:[],plans:[],done:[],todo:[],metrics:[]},keys=['T01','T02'],g=(x)=>({platform:'닥터빌',title:'a',task_keys:['T01'],done:[],todo:[],...x});
- assert.throws(()=>validSummary({...base,groups:[g({task_keys:['T09']})]},['r1'],[],keys),/업무 그룹/);
- assert.throws(()=>validSummary({...base,groups:[g({platform:'기타'})]},['r1'],[],keys),/업무 그룹/);
- assert.throws(()=>validSummary({...base,groups:[g({done:Array(7).fill('x')})]},['r1'],[],keys),/업무 그룹/);
+ assert.deepEqual(validSummary({...base,groups:[g({task_keys:['T09'],done:['x']})]},['r1'],[],keys).groups,[],'a group made only of unknown task keys is dropped');
+ assert.deepEqual(validSummary({...base,groups:[g({task_keys:['T09','T02'],done:['x']})]},['r1'],[],keys).groups[0].task_keys,['T02']);
+ assert.deepEqual(validSummary({...base,groups:[g({platform:'기타',done:['x']})]},['r1'],[],keys).groups,[]);
+ assert.equal(validSummary({...base,groups:[g({done:Array(7).fill('x')})]},['r1'],[],keys).groups[0].done.length,6);
+ assert.deepEqual(validSummary({...base,groups:[g({task_keys:['T01'],done:['x']}),g({task_keys:[],title:'기타',done:['y']})]},['r1'],[],[]).groups,[],'weekly (no tasks) never keeps groups');
+ assert.throws(()=>validSummary({...base,groups:'x'},['r1'],[],keys),/업무 그룹/);
  const v=validSummary({...base,groups:[g({done:['a']}),g({task_keys:['T01','T02'],done:['b']}),g({task_keys:['T01'],done:['c']}),g({task_keys:[],done:[]})]},['r1'],[],keys);
  assert.deepEqual(v.groups.map(x=>[x.task_keys,x.done[0]]),[[['T01'],'a'],[['T02'],'b']]);assert.deepEqual(validSummary({...base},['r1']).groups,[]);
  const schema=sourceBoundSchema(['r1'],[],keys),gp=schema.properties.groups;assert.equal(gp.minItems,1);assert.equal(gp.maxItems,6);
